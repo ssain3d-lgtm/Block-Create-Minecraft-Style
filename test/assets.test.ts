@@ -15,7 +15,7 @@ describe("asset factory", () => {
     const a = createNodeEngine({ baseDir: dir, libraryDir: lib });
 
     // 1-2. nothing suitable yet
-    expect(a.run("searchAssets", { text: "gentle", kind: "shape" }).count).toBe(0);
+    expect(a.run("searchAssets", { text: "gentle_slope", kind: "shape" }).count).toBe(0);
 
     // 3-5. new parametric slope shape + material, registered in the library
     const shape = a.run("createShape", {

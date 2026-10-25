@@ -3,7 +3,7 @@
 > 세션이 끊기면 이 파일부터 읽고 "다음 작업"부터 이어간다. 설계 기준은 `DESIGN.md`.
 
 ## 현재 단계
-3단계 — 자산 팩토리 / 완료 (다음: 4단계 생성기·플랜)
+4단계 — 생성기·플랜·예제 / 완료 (다음: 5단계 성능·벤치마크)
 
 ## 완료
 - [x] World/Chunk(16³, 희소 저장, 구조물 인덱스, dirty 청크 표시) — `test/engine.test.ts`
@@ -30,11 +30,19 @@
 - [x] 형상 검증: 칸 밖 좌표·NaN·삼각형 수 초과 거부(hint 포함), 곡선은 칸 안으로 자동 맞춤, solidFaces 자동 감지(box/subvoxel)
 - [x] 스튜디오 예제 "형상·재질 견본" — 내장 형상 17종 × 4방향 + AI 곡선 기와·둥근 기둥
 
+- [x] 고수준 생성기 14종(재시공 가능): createBuilding, createFoundation(석축 경사), createFloor(구멍·테두리·층 등록), createWall(루프/직선, 문·창문 자동 배열, 띠, 모서리), createRoof(gable/hip/pyramid/shed/flat/irimoya, 경사 블록 자동 선택, 처마 휨), createTower(lattice/shell/solid, 곡선 테이퍼), createCylinder, createArch, createTruss(경로·폭 테이퍼·X 브레이싱·강조선), createLine, createPillar, createStairs, createTerrain, createTree
+- [x] 앵커 참조 `{"ref":"walls","anchor":"top"}`, 면적 `{"on":{"ref":"base","inset":1}}`, 건물 기준 상대 좌표
+- [x] 구조물 작업: rebuildStructure, modifyStructure(인자 일부만 바꿔 그 구조물만 재시공 + 연쇄), duplicateStructure(회전·대칭·반복, 원본을 따라감), moveBuilding
+- [x] executePlan: 자산 → 건물별 구조물 → after 순서, 한 번의 되돌리기, dryRun, 실패 시 어느 구조물인지 표시 + 전체 롤백
+- [x] 예제 플랜 4종(`examples/*.plan.json`, `npm run examples`로 생성): A 에펠탑 121,892블록 · B 일본 성곽 · C 비대칭 모던하우스 · D AI 테스트 하우스 — `test/plans.test.ts`
+- [x] 예제 D 검증: JSON만으로 집 제작, 새 경사 블록 생성·등록·지붕에 사용, 지붕만 수정(다른 구조물 블록 동일), 되돌리기, 저장·불러오기, 재실행 일치
+- [x] 트러스·잎 블록 경량화(서브복셀 면 병합): 트러스 1008→304, 창살 464→64, 잎 1188→84 삼각형
+
 ## 진행 중
 - (없음)
 
 ## 미완료
-- [ ] 4단계 생성기·플랜 / 5단계 성능 / 6단계 AI 연결·검수
+- [ ] 5단계 성능 벤치마크 / 6단계 AI 연결(HTTP·MCP)·검수(inspect·스크린샷)·GLB
 
 ## 실행 방법
 - Windows: `run.bat` 더블클릭 → 브라우저에서 http://localhost:5173
@@ -42,6 +50,7 @@
 npm install
 npm test
 npm run vox -- commands
+npm run vox -- run examples/eiffel.plan.json --project projects/eiffel.vox.json --quiet
 npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9,0,9],\"material\":\"stone\"}}" --project projects/test.vox.json --quiet
 ```
 
@@ -49,7 +58,7 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 (아직 없음 — 추정치는 쓰지 않는다)
 
 ## 다음 작업 (재개 시 여기부터)
-1. 4단계: 고수준 생성기(createBuilding/Foundation/Floor/Wall/Roof/Tower/Arch/Truss/Pillar/Beam/Stairs/Terrain/Tree), 앵커 참조, executePlan(dry-run), modify/rebuild/duplicate, 예제 D(집)·A(에펠탑)
+1. 5단계: 벤치마크 스크립트(10만/30만 블록 + 에펠탑: 로딩·메시·FPS·편집 시간), Web Worker 메시 생성 검토, 실측 기록
 
 ## 결정 기록
 - 2026-10-26: npm workspaces 대신 **단일 패키지 + 폴더 분리**(`src/engine`, `src/render`, `src/studio`, `src/cli`, `src/node`, `src/server`). Windows에서 설치·실행이 단순해서. `src/engine`은 three/node 모듈을 import하지 않는다(브라우저·Node 공용).

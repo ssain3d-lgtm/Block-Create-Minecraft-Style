@@ -1,0 +1,452 @@
+{
+  "plan": "japanese_castle",
+  "newProject": true,
+  "name": "일본 성곽",
+  "title": "white heron",
+  "description": "석축 위 다층 천수각.\nAI가 만든 곡선 기와 블록을 지붕에 사용.",
+  "tags": [
+    "일본",
+    "성곽"
+  ],
+  "cellSize": 1,
+  "assets": [
+    {
+      "cmd": "createMaterial",
+      "args": {
+        "id": "ai.kawara",
+        "name": "짙은 기와",
+        "kind": "tile",
+        "color": "#3e4652",
+        "tags": [
+          "roof",
+          "japanese"
+        ]
+      }
+    },
+    {
+      "cmd": "createShape",
+      "args": {
+        "id": "ai.kawara_tile",
+        "name": "곡선 기와",
+        "tags": [
+          "roof",
+          "tile",
+          "japanese",
+          "curved"
+        ],
+        "recipe": {
+          "type": "curve",
+          "axis": "x",
+          "thickness": 0.22,
+          "path": [
+            [
+              0,
+              0.95
+            ],
+            [
+              0.3,
+              0.72
+            ],
+            [
+              0.6,
+              0.42
+            ],
+            [
+              0.85,
+              0.18
+            ],
+            [
+              1,
+              0.12
+            ]
+          ]
+        }
+      }
+    }
+  ],
+  "buildings": [
+    {
+      "name": "castle",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "structures": [
+        {
+          "key": "ground",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "대지",
+            "area": {
+              "at": [
+                -26,
+                0,
+                -26
+              ],
+              "size": [
+                86,
+                80
+              ]
+            },
+            "depth": 2,
+            "material": "grass",
+            "border": {
+              "material": "leaf_dark",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "moat",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "해자",
+            "area": {
+              "at": [
+                -18,
+                0,
+                -18
+              ],
+              "size": [
+                70,
+                64
+              ]
+            },
+            "material": "water",
+            "border": {
+              "material": "stone_dark",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "island",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "성 안 마당",
+            "area": {
+              "at": [
+                -12,
+                0,
+                -12
+              ],
+              "size": [
+                58,
+                52
+              ]
+            },
+            "material": "sand",
+            "border": {
+              "material": "stone_dark",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "outer_wall",
+          "cmd": "createWall",
+          "args": {
+            "name": "성벽",
+            "loop": {
+              "at": [
+                -11,
+                1,
+                -11
+              ],
+              "size": [
+                56,
+                50
+              ]
+            },
+            "height": 3,
+            "material": "plaster",
+            "bands": [
+              {
+                "y": 0,
+                "material": "stone_dark"
+              },
+              {
+                "y": 2,
+                "material": "roof_tile"
+              }
+            ],
+            "openings": [
+              {
+                "side": "south",
+                "at": 25,
+                "width": 4,
+                "height": 3,
+                "bottom": 0,
+                "fill": null
+              }
+            ]
+          }
+        },
+        {
+          "key": "bridge",
+          "cmd": "createFloor",
+          "args": {
+            "name": "다리",
+            "area": {
+              "at": [
+                14,
+                1,
+                38
+              ],
+              "size": [
+                4,
+                8
+              ]
+            },
+            "material": "wood_dark",
+            "shape": "floor"
+          }
+        },
+        {
+          "key": "base",
+          "cmd": "createFoundation",
+          "args": {
+            "name": "석축",
+            "area": {
+              "at": [
+                0,
+                1,
+                0
+              ],
+              "size": [
+                34,
+                28
+              ]
+            },
+            "height": 8,
+            "taper": 0.5,
+            "slope": true,
+            "material": "stone",
+            "topMaterial": "stone_light",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "t1",
+          "cmd": "createWall",
+          "args": {
+            "name": "1층",
+            "loop": {
+              "on": {
+                "ref": "base",
+                "inset": 1
+              }
+            },
+            "height": 5,
+            "material": "plaster",
+            "corners": "wood_dark",
+            "bands": [
+              {
+                "y": 4,
+                "material": "wood_dark"
+              }
+            ],
+            "windows": {
+              "width": 1,
+              "height": 2,
+              "bottom": 1,
+              "spacing": 2,
+              "margin": 2,
+              "fill": "wood_dark",
+              "fillShape": "lattice"
+            },
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "t1_roof",
+          "cmd": "createRoof",
+          "args": {
+            "name": "1층 지붕",
+            "area": {
+              "on": {
+                "ref": "t1"
+              }
+            },
+            "overhang": 2,
+            "material": "ai.kawara",
+            "slopeShape": "ai.kawara_tile",
+            "ridgeMaterial": "roof_tile",
+            "solid": true,
+            "fillMaterial": "plaster",
+            "tags": [
+              "main"
+            ],
+            "style": "hip",
+            "pitch": 0.5,
+            "curve": 0.7
+          }
+        },
+        {
+          "key": "t2",
+          "cmd": "createWall",
+          "args": {
+            "name": "2층",
+            "loop": {
+              "on": {
+                "ref": "t1",
+                "inset": 3
+              }
+            },
+            "height": 5,
+            "material": "plaster",
+            "corners": "wood_dark",
+            "bands": [
+              {
+                "y": 4,
+                "material": "wood_dark"
+              }
+            ],
+            "windows": {
+              "width": 1,
+              "height": 2,
+              "bottom": 1,
+              "spacing": 2,
+              "margin": 2,
+              "fill": "wood_dark",
+              "fillShape": "lattice"
+            },
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "t2_roof",
+          "cmd": "createRoof",
+          "args": {
+            "name": "2층 지붕",
+            "area": {
+              "on": {
+                "ref": "t2"
+              }
+            },
+            "overhang": 2,
+            "material": "ai.kawara",
+            "slopeShape": "ai.kawara_tile",
+            "ridgeMaterial": "roof_tile",
+            "solid": true,
+            "fillMaterial": "plaster",
+            "tags": [
+              "main"
+            ],
+            "style": "hip",
+            "pitch": 0.5,
+            "curve": 0.7
+          }
+        },
+        {
+          "key": "t3",
+          "cmd": "createWall",
+          "args": {
+            "name": "3층",
+            "loop": {
+              "on": {
+                "ref": "t2",
+                "inset": 3
+              }
+            },
+            "height": 5,
+            "material": "plaster",
+            "corners": "wood_dark",
+            "bands": [
+              {
+                "y": 4,
+                "material": "wood_dark"
+              }
+            ],
+            "windows": {
+              "width": 1,
+              "height": 2,
+              "bottom": 1,
+              "spacing": 2,
+              "margin": 2,
+              "fill": "wood_dark",
+              "fillShape": "lattice"
+            },
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "t3_roof",
+          "cmd": "createRoof",
+          "args": {
+            "name": "3층 지붕",
+            "area": {
+              "on": {
+                "ref": "t3"
+              }
+            },
+            "overhang": 2,
+            "material": "ai.kawara",
+            "slopeShape": "ai.kawara_tile",
+            "ridgeMaterial": "roof_tile",
+            "solid": true,
+            "fillMaterial": "plaster",
+            "tags": [
+              "main"
+            ],
+            "style": "irimoya",
+            "pitch": 0.75,
+            "curve": 0.9
+          }
+        },
+        {
+          "key": "pines",
+          "cmd": "createTree",
+          "args": {
+            "name": "소나무",
+            "positions": [
+              [
+                -6,
+                1,
+                -6
+              ],
+              [
+                40,
+                1,
+                -6
+              ],
+              [
+                -6,
+                1,
+                34
+              ],
+              [
+                40,
+                1,
+                34
+              ],
+              [
+                6,
+                1,
+                34
+              ],
+              [
+                30,
+                1,
+                -6
+              ]
+            ],
+            "height": 4,
+            "crown": 2,
+            "style": "cone",
+            "material": "leaf_teal"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,358 @@
+{
+  "plan": "asymmetric_modern_house",
+  "newProject": true,
+  "name": "모던하우스",
+  "title": "cantilever",
+  "description": "돌출된 2층 박스, 유리 벽, 콘크리트 외벽,\n높이가 다른 지붕 세 개.",
+  "tags": [
+    "모던",
+    "주택"
+  ],
+  "cellSize": 1,
+  "assets": [],
+  "buildings": [
+    {
+      "name": "modern",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "structures": [
+        {
+          "key": "lawn",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "잔디",
+            "area": {
+              "at": [
+                -20,
+                0,
+                -14
+              ],
+              "size": [
+                58,
+                44
+              ]
+            },
+            "depth": 2,
+            "material": "grass",
+            "border": {
+              "material": "leaf_dark",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "pool",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "수영장",
+            "area": {
+              "at": [
+                2,
+                0,
+                15
+              ],
+              "size": [
+                16,
+                6
+              ]
+            },
+            "material": "water",
+            "border": {
+              "material": "concrete_white",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "deck",
+          "cmd": "createFloor",
+          "args": {
+            "name": "데크",
+            "area": {
+              "at": [
+                0,
+                1,
+                11
+              ],
+              "size": [
+                22,
+                3
+              ]
+            },
+            "material": "wood_oak",
+            "shape": "floor"
+          }
+        },
+        {
+          "key": "baseA",
+          "cmd": "createFoundation",
+          "args": {
+            "name": "본채 기초",
+            "area": {
+              "at": [
+                0,
+                1,
+                0
+              ],
+              "size": [
+                22,
+                11
+              ]
+            },
+            "material": "concrete"
+          }
+        },
+        {
+          "key": "wallsA",
+          "cmd": "createWall",
+          "args": {
+            "name": "본채 벽",
+            "loop": {
+              "on": {
+                "ref": "baseA"
+              }
+            },
+            "height": 4,
+            "material": "concrete_white",
+            "openings": [
+              {
+                "side": "south",
+                "at": 2,
+                "width": 12,
+                "height": 4,
+                "bottom": 0,
+                "fill": "glass"
+              },
+              {
+                "side": "east",
+                "at": 3,
+                "width": 4,
+                "height": 3,
+                "bottom": 0,
+                "fill": "glass"
+              }
+            ],
+            "windows": {
+              "width": 2,
+              "height": 1,
+              "bottom": 2,
+              "spacing": 3,
+              "margin": 2,
+              "sides": [
+                "north"
+              ]
+            }
+          }
+        },
+        {
+          "key": "roofA",
+          "cmd": "createRoof",
+          "args": {
+            "name": "본채 지붕",
+            "area": {
+              "on": {
+                "ref": "wallsA"
+              }
+            },
+            "style": "flat",
+            "overhang": 1,
+            "material": "concrete",
+            "parapet": {
+              "height": 1,
+              "material": "concrete_white"
+            }
+          }
+        },
+        {
+          "key": "floorB",
+          "cmd": "createFloor",
+          "args": {
+            "name": "돌출 박스 바닥",
+            "area": {
+              "at": [
+                8,
+                7,
+                -4
+              ],
+              "size": [
+                20,
+                10
+              ]
+            },
+            "thickness": 1,
+            "material": "concrete"
+          }
+        },
+        {
+          "key": "wallsB",
+          "cmd": "createWall",
+          "args": {
+            "name": "돌출 박스",
+            "loop": {
+              "on": {
+                "ref": "floorB"
+              }
+            },
+            "height": 4,
+            "material": "asphalt",
+            "corners": "steel",
+            "openings": [
+              {
+                "side": "east",
+                "at": 1,
+                "width": 8,
+                "height": 3,
+                "bottom": 0,
+                "fill": "glass"
+              }
+            ],
+            "windows": {
+              "width": 3,
+              "height": 2,
+              "bottom": 1,
+              "spacing": 1,
+              "margin": 1,
+              "sides": [
+                "south",
+                "north"
+              ]
+            }
+          }
+        },
+        {
+          "key": "roofB",
+          "cmd": "createRoof",
+          "args": {
+            "name": "박스 지붕",
+            "area": {
+              "on": {
+                "ref": "wallsB"
+              }
+            },
+            "style": "flat",
+            "overhang": 0,
+            "material": "slate"
+          }
+        },
+        {
+          "key": "baseC",
+          "cmd": "createFoundation",
+          "args": {
+            "name": "별채 기초",
+            "area": {
+              "at": [
+                -12,
+                1,
+                3
+              ],
+              "size": [
+                11,
+                8
+              ]
+            },
+            "material": "concrete"
+          }
+        },
+        {
+          "key": "wallsC",
+          "cmd": "createWall",
+          "args": {
+            "name": "별채",
+            "loop": {
+              "on": {
+                "ref": "baseC"
+              }
+            },
+            "height": 3,
+            "material": "wood_dark",
+            "openings": [
+              {
+                "side": "south",
+                "at": 3,
+                "width": 5,
+                "height": 3,
+                "bottom": 0,
+                "fill": "glass"
+              }
+            ]
+          }
+        },
+        {
+          "key": "roofC",
+          "cmd": "createRoof",
+          "args": {
+            "name": "별채 경사 지붕",
+            "area": {
+              "on": {
+                "ref": "wallsC"
+              }
+            },
+            "style": "shed",
+            "shedFacing": "north",
+            "pitch": 0.5,
+            "overhang": 1,
+            "material": "steel"
+          }
+        },
+        {
+          "key": "column",
+          "cmd": "createPillar",
+          "args": {
+            "name": "강철 기둥",
+            "positions": [
+              [
+                26,
+                2,
+                4
+              ],
+              [
+                26,
+                2,
+                -3
+              ]
+            ],
+            "height": 5,
+            "material": "steel",
+            "shape": "post"
+          }
+        },
+        {
+          "key": "trees",
+          "cmd": "createTree",
+          "args": {
+            "name": "나무",
+            "positions": [
+              [
+                -16,
+                1,
+                -10
+              ],
+              [
+                32,
+                1,
+                -10
+              ],
+              [
+                -16,
+                1,
+                24
+              ],
+              [
+                33,
+                1,
+                22
+              ]
+            ],
+            "height": 5,
+            "crown": 2,
+            "style": "cone",
+            "material": "leaf"
+          }
+        }
+      ]
+    }
+  ]
+}

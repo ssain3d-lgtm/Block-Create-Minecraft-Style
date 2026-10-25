@@ -100,23 +100,54 @@ function curveInto(s: Soup, path: P2[], thickness: number, axis: "x" | "z", from
   extrudeInto(s, outline, axis, from, to);
 }
 
+/** Sub-voxel mask -> faces, with 2D greedy merging per slice (keeps lattice shapes light). */
 function subvoxelInto(s: Soup, size: number, mask: string[][]) {
+  const n = size;
   const filled = (x: number, y: number, z: number) =>
-    x >= 0 && y >= 0 && z >= 0 && x < size && y < size && z < size && mask[y]?.[z]?.[x] === "#";
-  const k = 1 / size;
-  for (let y = 0; y < size; y++)
-    for (let z = 0; z < size; z++)
-      for (let x = 0; x < size; x++) {
-        if (!filled(x, y, z)) continue;
-        const skip = new Set<FaceName>();
-        if (filled(x + 1, y, z)) skip.add("+x");
-        if (filled(x - 1, y, z)) skip.add("-x");
-        if (filled(x, y + 1, z)) skip.add("+y");
-        if (filled(x, y - 1, z)) skip.add("-y");
-        if (filled(x, y, z + 1)) skip.add("+z");
-        if (filled(x, y, z - 1)) skip.add("-z");
-        boxInto(s, [x * k, y * k, z * k], [(x + 1) * k, (y + 1) * k, (z + 1) * k], skip);
+    x >= 0 && y >= 0 && z >= 0 && x < n && y < n && z < n && mask[y]?.[z]?.[x] === "#";
+  const k = 1 / n;
+  // axis d = normal axis; u, v = the other two axes
+  for (let d = 0; d < 3; d++) {
+    const u = (d + 1) % 3, v = (d + 2) % 3;
+    for (const sign of [1, -1]) {
+      for (let slice = 0; slice < n; slice++) {
+        // exposed[a][b]: cell at (d=slice, u=a, v=b) is filled and its neighbour along sign is empty
+        const exposed: boolean[] = new Array(n * n).fill(false);
+        for (let a = 0; a < n; a++)
+          for (let b = 0; b < n; b++) {
+            const c = [0, 0, 0];
+            c[d] = slice; c[u] = a; c[v] = b;
+            if (!filled(c[0], c[1], c[2])) continue;
+            const nb = [...c];
+            nb[d] += sign;
+            if (!filled(nb[0], nb[1], nb[2])) exposed[a * n + b] = true;
+          }
+        // greedy rectangles
+        for (let a = 0; a < n; a++)
+          for (let b = 0; b < n; b++) {
+            if (!exposed[a * n + b]) continue;
+            let w = 1;
+            while (b + w < n && exposed[a * n + b + w]) w++;
+            let h = 1;
+            outer: while (a + h < n) {
+              for (let j = 0; j < w; j++) if (!exposed[(a + h) * n + b + j]) break outer;
+              h++;
+            }
+            for (let i = 0; i < h; i++) for (let j = 0; j < w; j++) exposed[(a + i) * n + b + j] = false;
+            const plane = (sign > 0 ? slice + 1 : slice) * k;
+            const p = (aa: number, bb: number): V3 => {
+              const o = [0, 0, 0];
+              o[d] = plane; o[u] = aa * k; o[v] = bb * k;
+              return o as V3;
+            };
+            const p00 = p(a, b), p10 = p(a + h, b), p11 = p(a + h, b + w), p01 = p(a, b + w);
+            // (u x v) points along +d, so CCW in (u, v) faces +d
+            if (sign > 0) s.addQuad(p00, p10, p11, p01);
+            else s.addQuad(p00, p01, p11, p10);
+          }
       }
+    }
+  }
 }
 
 function recipeInto(s: Soup, r: Recipe, depth = 0) {

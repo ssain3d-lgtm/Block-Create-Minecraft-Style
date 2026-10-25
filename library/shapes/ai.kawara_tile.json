@@ -1,0 +1,39 @@
+{
+  "id": "ai.kawara_tile",
+  "name": "곡선 기와",
+  "recipe": {
+    "type": "curve",
+    "path": [
+      [
+        0,
+        0.95
+      ],
+      [
+        0.3,
+        0.72
+      ],
+      [
+        0.6,
+        0.42
+      ],
+      [
+        0.85,
+        0.18
+      ],
+      [
+        1,
+        0.12
+      ]
+    ],
+    "thickness": 0.22,
+    "axis": "x"
+  },
+  "solidFaces": [],
+  "tags": [
+    "roof",
+    "tile",
+    "japanese",
+    "curved"
+  ],
+  "version": 1
+}

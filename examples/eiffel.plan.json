@@ -1,0 +1,1410 @@
+{
+  "plan": "eiffel_iron_lace",
+  "newProject": true,
+  "name": "에펠탑",
+  "title": "iron lace",
+  "description": "324블록 철 레이스,\n블록으로 세운 파리의 탑.",
+  "tags": [
+    "파리, 프랑스",
+    "샹드마르스"
+  ],
+  "cellSize": 1,
+  "assets": [],
+  "buildings": [
+    {
+      "name": "eiffel",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "structures": [
+        {
+          "key": "lawn",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "잔디밭",
+            "area": {
+              "at": [
+                -90,
+                0,
+                -90
+              ],
+              "size": [
+                181,
+                181
+              ]
+            },
+            "depth": 2,
+            "material": "grass",
+            "border": {
+              "material": "leaf_dark",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "plaza",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "광장",
+            "area": {
+              "at": [
+                -75,
+                0,
+                -75
+              ],
+              "size": [
+                151,
+                136
+              ]
+            },
+            "material": "paving",
+            "border": {
+              "material": "stone_light",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "garden_w",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "서쪽 화단",
+            "area": {
+              "at": [
+                -58,
+                0,
+                -30
+              ],
+              "size": [
+                8,
+                60
+              ]
+            },
+            "material": "grass",
+            "border": {
+              "material": "leaf_dark",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "garden_e",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "동쪽 화단",
+            "area": {
+              "at": [
+                51,
+                0,
+                -30
+              ],
+              "size": [
+                8,
+                60
+              ]
+            },
+            "material": "grass",
+            "border": {
+              "material": "leaf_dark",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "avenue",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "가로수 길",
+            "area": {
+              "at": [
+                -75,
+                0,
+                61
+              ],
+              "size": [
+                151,
+                4
+              ]
+            },
+            "material": "asphalt"
+          }
+        },
+        {
+          "key": "pool",
+          "cmd": "createCylinder",
+          "args": {
+            "name": "분수 연못",
+            "center": [
+              0,
+              0,
+              76
+            ],
+            "radius": 7,
+            "height": 1,
+            "material": "water"
+          }
+        },
+        {
+          "key": "pool_rim",
+          "cmd": "createCylinder",
+          "args": {
+            "name": "연못 테두리",
+            "center": [
+              0,
+              1,
+              76
+            ],
+            "radius": 8,
+            "height": 1,
+            "hollow": true,
+            "material": "stone_light"
+          }
+        },
+        {
+          "key": "trees",
+          "cmd": "createTree",
+          "args": {
+            "name": "가로수",
+            "positions": [
+              [
+                -66,
+                1,
+                70
+              ],
+              [
+                -66,
+                1,
+                82
+              ],
+              [
+                -58,
+                1,
+                70
+              ],
+              [
+                -58,
+                1,
+                82
+              ],
+              [
+                -50,
+                1,
+                70
+              ],
+              [
+                -50,
+                1,
+                82
+              ],
+              [
+                -42,
+                1,
+                70
+              ],
+              [
+                -42,
+                1,
+                82
+              ],
+              [
+                -34,
+                1,
+                70
+              ],
+              [
+                -34,
+                1,
+                82
+              ],
+              [
+                -26,
+                1,
+                70
+              ],
+              [
+                -26,
+                1,
+                82
+              ],
+              [
+                -18,
+                1,
+                70
+              ],
+              [
+                -18,
+                1,
+                82
+              ],
+              [
+                22,
+                1,
+                70
+              ],
+              [
+                22,
+                1,
+                82
+              ],
+              [
+                30,
+                1,
+                70
+              ],
+              [
+                30,
+                1,
+                82
+              ],
+              [
+                38,
+                1,
+                70
+              ],
+              [
+                38,
+                1,
+                82
+              ],
+              [
+                46,
+                1,
+                70
+              ],
+              [
+                46,
+                1,
+                82
+              ],
+              [
+                54,
+                1,
+                70
+              ],
+              [
+                54,
+                1,
+                82
+              ],
+              [
+                62,
+                1,
+                70
+              ],
+              [
+                62,
+                1,
+                82
+              ],
+              [
+                -82,
+                1,
+                -60
+              ],
+              [
+                82,
+                1,
+                -60
+              ],
+              [
+                -82,
+                1,
+                -50
+              ],
+              [
+                82,
+                1,
+                -50
+              ],
+              [
+                -82,
+                1,
+                -40
+              ],
+              [
+                82,
+                1,
+                -40
+              ],
+              [
+                -82,
+                1,
+                -30
+              ],
+              [
+                82,
+                1,
+                -30
+              ],
+              [
+                -82,
+                1,
+                -20
+              ],
+              [
+                82,
+                1,
+                -20
+              ],
+              [
+                -82,
+                1,
+                -10
+              ],
+              [
+                82,
+                1,
+                -10
+              ],
+              [
+                -82,
+                1,
+                0
+              ],
+              [
+                82,
+                1,
+                0
+              ],
+              [
+                -82,
+                1,
+                10
+              ],
+              [
+                82,
+                1,
+                10
+              ],
+              [
+                -82,
+                1,
+                20
+              ],
+              [
+                82,
+                1,
+                20
+              ],
+              [
+                -82,
+                1,
+                30
+              ],
+              [
+                82,
+                1,
+                30
+              ],
+              [
+                -82,
+                1,
+                40
+              ],
+              [
+                82,
+                1,
+                40
+              ],
+              [
+                -82,
+                1,
+                50
+              ],
+              [
+                82,
+                1,
+                50
+              ],
+              [
+                -82,
+                1,
+                60
+              ],
+              [
+                82,
+                1,
+                60
+              ]
+            ],
+            "height": 4,
+            "crown": 2,
+            "material": "leaf"
+          }
+        },
+        {
+          "key": "trees2",
+          "cmd": "createTree",
+          "args": {
+            "name": "정원수",
+            "positions": [
+              [
+                -54,
+                1,
+                -24
+              ],
+              [
+                -54,
+                1,
+                -6
+              ],
+              [
+                -54,
+                1,
+                12
+              ],
+              [
+                55,
+                1,
+                -24
+              ],
+              [
+                55,
+                1,
+                -6
+              ],
+              [
+                55,
+                1,
+                12
+              ]
+            ],
+            "height": 3,
+            "crown": 2,
+            "material": "leaf_teal",
+            "style": "round"
+          }
+        },
+        {
+          "key": "lamps",
+          "cmd": "createPillar",
+          "args": {
+            "name": "가로등",
+            "positions": [
+              [
+                -60,
+                1,
+                64
+              ],
+              [
+                -60,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                -60
+              ],
+              [
+                -64,
+                1,
+                -60
+              ],
+              [
+                -45,
+                1,
+                64
+              ],
+              [
+                -45,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                -45
+              ],
+              [
+                -64,
+                1,
+                -45
+              ],
+              [
+                -30,
+                1,
+                64
+              ],
+              [
+                -30,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                -30
+              ],
+              [
+                -64,
+                1,
+                -30
+              ],
+              [
+                -15,
+                1,
+                64
+              ],
+              [
+                -15,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                -15
+              ],
+              [
+                -64,
+                1,
+                -15
+              ],
+              [
+                0,
+                1,
+                64
+              ],
+              [
+                0,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                0
+              ],
+              [
+                -64,
+                1,
+                0
+              ],
+              [
+                15,
+                1,
+                64
+              ],
+              [
+                15,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                15
+              ],
+              [
+                -64,
+                1,
+                15
+              ],
+              [
+                30,
+                1,
+                64
+              ],
+              [
+                30,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                30
+              ],
+              [
+                -64,
+                1,
+                30
+              ],
+              [
+                45,
+                1,
+                64
+              ],
+              [
+                45,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                45
+              ],
+              [
+                -64,
+                1,
+                45
+              ],
+              [
+                60,
+                1,
+                64
+              ],
+              [
+                60,
+                1,
+                -64
+              ],
+              [
+                64,
+                1,
+                60
+              ],
+              [
+                -64,
+                1,
+                60
+              ]
+            ],
+            "height": 1,
+            "shape": "lamp_post",
+            "material": "lamp"
+          }
+        },
+        {
+          "key": "pad_se",
+          "cmd": "createFoundation",
+          "args": {
+            "name": "기초 SE",
+            "area": {
+              "at": [
+                40,
+                1,
+                40
+              ],
+              "size": [
+                21,
+                21
+              ]
+            },
+            "height": 2,
+            "taper": 1,
+            "slope": true,
+            "material": "stone_dark",
+            "topMaterial": "stone_light"
+          }
+        },
+        {
+          "key": "leg_se",
+          "cmd": "createTruss",
+          "args": {
+            "name": "다리 SE",
+            "path": [
+              [
+                49,
+                3,
+                49
+              ],
+              [
+                42,
+                18,
+                42
+              ],
+              [
+                34,
+                36,
+                34
+              ],
+              [
+                27,
+                57,
+                27
+              ],
+              [
+                22,
+                76,
+                22
+              ],
+              [
+                19,
+                96,
+                19
+              ],
+              [
+                17,
+                115,
+                17
+              ]
+            ],
+            "width": [
+              21,
+              11
+            ],
+            "pattern": "x",
+            "period": 4,
+            "frameEvery": 6,
+            "material": "iron_lower",
+            "chordMaterial": "iron_dark",
+            "columnSize": 2,
+            "accent": {
+              "material": "rail_red",
+              "face": "-x"
+            },
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "pad_sw",
+          "cmd": "createFoundation",
+          "args": {
+            "name": "기초 SW",
+            "area": {
+              "at": [
+                -60,
+                1,
+                40
+              ],
+              "size": [
+                21,
+                21
+              ]
+            },
+            "height": 2,
+            "taper": 1,
+            "slope": true,
+            "material": "stone_dark",
+            "topMaterial": "stone_light"
+          }
+        },
+        {
+          "key": "leg_sw",
+          "cmd": "createTruss",
+          "args": {
+            "name": "다리 SW",
+            "path": [
+              [
+                -49,
+                3,
+                49
+              ],
+              [
+                -42,
+                18,
+                42
+              ],
+              [
+                -34,
+                36,
+                34
+              ],
+              [
+                -27,
+                57,
+                27
+              ],
+              [
+                -22,
+                76,
+                22
+              ],
+              [
+                -19,
+                96,
+                19
+              ],
+              [
+                -17,
+                115,
+                17
+              ]
+            ],
+            "width": [
+              21,
+              11
+            ],
+            "pattern": "x",
+            "period": 4,
+            "frameEvery": 6,
+            "material": "iron_lower",
+            "chordMaterial": "iron_dark",
+            "columnSize": 2,
+            "accent": {
+              "material": "rail_red",
+              "face": "+x"
+            },
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "pad_nw",
+          "cmd": "createFoundation",
+          "args": {
+            "name": "기초 NW",
+            "area": {
+              "at": [
+                -60,
+                1,
+                -60
+              ],
+              "size": [
+                21,
+                21
+              ]
+            },
+            "height": 2,
+            "taper": 1,
+            "slope": true,
+            "material": "stone_dark",
+            "topMaterial": "stone_light"
+          }
+        },
+        {
+          "key": "leg_nw",
+          "cmd": "createTruss",
+          "args": {
+            "name": "다리 NW",
+            "path": [
+              [
+                -49,
+                3,
+                -49
+              ],
+              [
+                -42,
+                18,
+                -42
+              ],
+              [
+                -34,
+                36,
+                -34
+              ],
+              [
+                -27,
+                57,
+                -27
+              ],
+              [
+                -22,
+                76,
+                -22
+              ],
+              [
+                -19,
+                96,
+                -19
+              ],
+              [
+                -17,
+                115,
+                -17
+              ]
+            ],
+            "width": [
+              21,
+              11
+            ],
+            "pattern": "x",
+            "period": 4,
+            "frameEvery": 6,
+            "material": "iron_lower",
+            "chordMaterial": "iron_dark",
+            "columnSize": 2,
+            "accent": {
+              "material": "rail_red",
+              "face": "+x"
+            },
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "pad_ne",
+          "cmd": "createFoundation",
+          "args": {
+            "name": "기초 NE",
+            "area": {
+              "at": [
+                40,
+                1,
+                -60
+              ],
+              "size": [
+                21,
+                21
+              ]
+            },
+            "height": 2,
+            "taper": 1,
+            "slope": true,
+            "material": "stone_dark",
+            "topMaterial": "stone_light"
+          }
+        },
+        {
+          "key": "leg_ne",
+          "cmd": "createTruss",
+          "args": {
+            "name": "다리 NE",
+            "path": [
+              [
+                49,
+                3,
+                -49
+              ],
+              [
+                42,
+                18,
+                -42
+              ],
+              [
+                34,
+                36,
+                -34
+              ],
+              [
+                27,
+                57,
+                -27
+              ],
+              [
+                22,
+                76,
+                -22
+              ],
+              [
+                19,
+                96,
+                -19
+              ],
+              [
+                17,
+                115,
+                -17
+              ]
+            ],
+            "width": [
+              21,
+              11
+            ],
+            "pattern": "x",
+            "period": 4,
+            "frameEvery": 6,
+            "material": "iron_lower",
+            "chordMaterial": "iron_dark",
+            "columnSize": 2,
+            "accent": {
+              "material": "rail_red",
+              "face": "-x"
+            },
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "arch_s",
+          "cmd": "createArch",
+          "args": {
+            "name": "아치 남",
+            "from": [
+              -36,
+              12,
+              44
+            ],
+            "to": [
+              36,
+              12,
+              44
+            ],
+            "rise": 42,
+            "thickness": 2,
+            "depth": 2,
+            "material": "iron_mid",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "arch_n",
+          "cmd": "createArch",
+          "args": {
+            "name": "아치 북",
+            "from": [
+              -36,
+              12,
+              -45
+            ],
+            "to": [
+              36,
+              12,
+              -45
+            ],
+            "rise": 42,
+            "thickness": 2,
+            "depth": 2,
+            "material": "iron_mid",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "arch_e",
+          "cmd": "createArch",
+          "args": {
+            "name": "아치 동",
+            "from": [
+              44,
+              12,
+              -36
+            ],
+            "to": [
+              44,
+              12,
+              36
+            ],
+            "rise": 42,
+            "thickness": 2,
+            "depth": 2,
+            "material": "iron_mid",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "arch_w",
+          "cmd": "createArch",
+          "args": {
+            "name": "아치 서",
+            "from": [
+              -45,
+              12,
+              -36
+            ],
+            "to": [
+              -45,
+              12,
+              36
+            ],
+            "rise": 42,
+            "thickness": 2,
+            "depth": 2,
+            "material": "iron_mid",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "deck1",
+          "cmd": "createFloor",
+          "args": {
+            "name": "1층 전망대 골조",
+            "area": {
+              "at": [
+                -42,
+                56,
+                -42
+              ],
+              "size": [
+                85,
+                85
+              ]
+            },
+            "hole": {
+              "size": [
+                41,
+                41
+              ]
+            },
+            "thickness": 2,
+            "material": "iron_dark",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "deck1_floor",
+          "cmd": "createFloor",
+          "args": {
+            "name": "1층 마루",
+            "area": {
+              "on": {
+                "ref": "deck1",
+                "inset": 1
+              }
+            },
+            "hole": {
+              "size": [
+                43,
+                43
+              ]
+            },
+            "thickness": 1,
+            "material": "wood_oak",
+            "shape": "floor",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "gallery1",
+          "cmd": "createWall",
+          "args": {
+            "name": "1층 회랑",
+            "loop": {
+              "on": {
+                "ref": "deck1"
+              }
+            },
+            "height": 5,
+            "material": "iron_mid",
+            "windows": {
+              "width": 3,
+              "height": 3,
+              "bottom": 1,
+              "spacing": 1,
+              "margin": 2,
+              "fill": "steel",
+              "fillShape": "lattice"
+            },
+            "bands": [
+              {
+                "y": 4,
+                "material": "iron_black"
+              }
+            ],
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "deck2",
+          "cmd": "createFloor",
+          "args": {
+            "name": "2층 전망대 골조",
+            "area": {
+              "at": [
+                -24,
+                114,
+                -24
+              ],
+              "size": [
+                49,
+                49
+              ]
+            },
+            "hole": {
+              "size": [
+                17,
+                17
+              ]
+            },
+            "thickness": 2,
+            "material": "iron_dark",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "deck2_floor",
+          "cmd": "createFloor",
+          "args": {
+            "name": "2층 마루",
+            "area": {
+              "on": {
+                "ref": "deck2",
+                "inset": 1
+              }
+            },
+            "hole": {
+              "size": [
+                19,
+                19
+              ]
+            },
+            "thickness": 1,
+            "material": "wood_oak",
+            "shape": "floor",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "gallery2",
+          "cmd": "createWall",
+          "args": {
+            "name": "2층 회랑",
+            "loop": {
+              "on": {
+                "ref": "deck2"
+              }
+            },
+            "height": 3,
+            "material": "iron_mid",
+            "windows": {
+              "width": 2,
+              "height": 2,
+              "bottom": 0,
+              "spacing": 1,
+              "margin": 1,
+              "fill": "steel",
+              "fillShape": "lattice"
+            },
+            "bands": [
+              {
+                "y": 2,
+                "material": "iron_black"
+              }
+            ],
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "upper",
+          "cmd": "createTower",
+          "args": {
+            "name": "상부 탑",
+            "center": [
+              0,
+              117,
+              0
+            ],
+            "height": 159,
+            "baseSize": 33,
+            "topSize": 9,
+            "profile": "curve",
+            "curve": 1.5,
+            "style": "lattice",
+            "material": "iron_mid",
+            "braceMaterial": "iron_lower",
+            "bracePeriod": 4,
+            "frameEvery": 8,
+            "columnSize": 3,
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "deck3",
+          "cmd": "createFloor",
+          "args": {
+            "name": "꼭대기 전망대",
+            "area": {
+              "at": [
+                -7,
+                276,
+                -7
+              ],
+              "size": [
+                15,
+                15
+              ]
+            },
+            "thickness": 1,
+            "material": "iron_dark",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "cabin",
+          "cmd": "createWall",
+          "args": {
+            "name": "꼭대기 전망실",
+            "loop": {
+              "on": {
+                "ref": "deck3",
+                "inset": 1
+              }
+            },
+            "height": 4,
+            "material": "iron_black",
+            "windows": {
+              "width": 2,
+              "height": 2,
+              "bottom": 1,
+              "spacing": 1,
+              "margin": 1,
+              "fill": "glass"
+            },
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "cap",
+          "cmd": "createRoof",
+          "args": {
+            "name": "전망실 지붕",
+            "area": {
+              "on": {
+                "ref": "cabin"
+              }
+            },
+            "style": "pyramid",
+            "pitch": 1,
+            "overhang": 1,
+            "material": "iron_dark",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "spire",
+          "cmd": "createTower",
+          "args": {
+            "name": "첨탑",
+            "center": {
+              "ref": "cap",
+              "anchor": "top"
+            },
+            "height": 30,
+            "baseSize": 3,
+            "topSize": 1,
+            "profile": "taper",
+            "style": "solid",
+            "material": "iron_black",
+            "tags": [
+              "main"
+            ]
+          }
+        },
+        {
+          "key": "beacon",
+          "cmd": "createPillar",
+          "args": {
+            "name": "등불",
+            "at": {
+              "ref": "spire",
+              "anchor": "top"
+            },
+            "height": 2,
+            "shape": "post",
+            "material": "lamp",
+            "tags": [
+              "main"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

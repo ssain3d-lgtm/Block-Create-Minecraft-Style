@@ -71,6 +71,8 @@ export interface CmdCtx {
   /** run another command inside the same transaction (one undo step) */
   run(cmd: string, args: unknown): any;
   engine: import("../engine").Engine;
+  /** set by a command (dry runs) to roll everything back after it returns */
+  rollbackOnly?: boolean;
 }
 
 export interface CommandDef<S extends z.ZodType = z.ZodType> {

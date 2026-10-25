@@ -72,8 +72,30 @@ function archProfile(): [number, number][] {
   return pts;
 }
 
-/** cube edges + X braces on the 4 vertical sides, as an 8^3 sub-voxel mask */
-function trussMask(n = 8): string[][] {
+/** 12 edge bars + X braces on the four vertical sides (about 230 triangles) */
+function trussRecipe(): Recipe {
+  const t = 0.12;
+  const bars: Recipe[] = [];
+  const B = (min: [number, number, number], max: [number, number, number]): Recipe => ({ type: "box", min, max });
+  for (const x of [0, 1 - t]) for (const z of [0, 1 - t]) bars.push(B([x, 0, z], [x + t, 1, z + t]));
+  for (const y of [0, 1 - t]) for (const z of [0, 1 - t]) bars.push(B([t, y, z], [1 - t, y + t, z + t]));
+  for (const y of [0, 1 - t]) for (const x of [0, 1 - t]) bars.push(B([x, y, t], [x + t, y + t, 1 - t]));
+  const d = 0.1;
+  const diagA: [number, number][] = [[t, t], [t + d, t], [1 - t, 1 - t - d], [1 - t, 1 - t], [1 - t - d, 1 - t], [t, t + d]];
+  const diagB: [number, number][] = diagA.map(([a, b]) => [1 - a, b]);
+  const parts: { recipe: Recipe }[] = bars.map((recipe) => ({ recipe }));
+  for (const prof of [diagA, diagB]) {
+    // faces z=0 and z=1 (profile in x,y extruded along z), faces x=0 and x=1 (profile in z,y along x)
+    parts.push({ recipe: { type: "extrude", axis: "z", profile: prof, from: 0.02, to: 0.08 } });
+    parts.push({ recipe: { type: "extrude", axis: "z", profile: prof, from: 0.92, to: 0.98 } });
+    parts.push({ recipe: { type: "extrude", axis: "x", profile: prof, from: 0.02, to: 0.08 } });
+    parts.push({ recipe: { type: "extrude", axis: "x", profile: prof, from: 0.92, to: 0.98 } });
+  }
+  return { type: "composite", parts };
+}
+
+/** (kept for reference) cube edges + X braces as an 8^3 sub-voxel mask */
+export function trussMask(n = 8): string[][] {
   const layers: string[][] = [];
   for (let y = 0; y < n; y++) {
     const rows: string[] = [];
@@ -110,7 +132,7 @@ function latticeMask(n = 8): string[][] {
   return layers;
 }
 
-function leavesMask(n = 8): string[][] {
+function leavesMask(n = 4): string[][] {
   // rounded leaf ball with a few holes (deterministic)
   const layers: string[][] = [];
   for (let y = 0; y < n; y++) {
@@ -118,7 +140,7 @@ function leavesMask(n = 8): string[][] {
     for (let z = 0; z < n; z++) {
       let row = "";
       for (let x = 0; x < n; x++) {
-        const hole = ((x * 7 + y * 13 + z * 5) % 11) === 0;
+        const hole = (x + y * 2 + z * 3) % 7 === 0 && !(y === 0 || y === n - 1);
         row += hole ? "." : "#";
       }
       rows.push(row);
@@ -135,6 +157,7 @@ export const BUILTIN_SHAPES: ShapeDef[] = [
   s("stair", "계단", { type: "extrude", axis: "x", profile: [[0, 0], [1, 0], [1, 0.5], [0.5, 0.5], [0.5, 1], [0, 1]] }, ["-y", "-z"], ["basic", "stair"], "Stair step; the tall side faces the 'facing' direction."),
   s("wedge", "경사", { type: "extrude", axis: "x", profile: [[0, 0], [1, 0], [0, 1]] }, ["-y", "-z"], ["basic", "slope", "roof"], "45 degree slope; tall side faces the 'facing' direction."),
   s("wedge_half", "완경사", { type: "extrude", axis: "x", profile: [[0, 0], [1, 0], [0, 0.5]] }, ["-y"], ["slope", "roof"], "Half-height slope (about 27 degrees)."),
+  s("wedge_half_hi", "완경사 상단", { type: "extrude", axis: "x", profile: [[0, 0], [1, 0], [1, 0.5], [0, 1]] }, ["-y", "-z"], ["slope", "roof"], "Upper half of a gentle slope (1 -> 0.5); pairs with wedge_half."),
   s("roof_plate", "지붕판", { type: "extrude", axis: "x", profile: [[0, 1], [0, 0.82], [1, -0.0], [1, 0.18]] }, [], ["roof", "slope"], "Thin sloped roof plate, high at the facing side."),
   s("pillar", "기둥", { type: "box", min: [0.25, 0, 0.25], max: [0.75, 1, 0.75] }, [], ["column", "structure"], "Half-width vertical column."),
   s("post", "가는 기둥", { type: "box", min: [0.375, 0, 0.375], max: [0.625, 1, 0.625] }, [], ["column", "thin"], "Thin post."),
@@ -147,10 +170,10 @@ export const BUILTIN_SHAPES: ShapeDef[] = [
       { recipe: { type: "box", min: [0, 0.75, 0.45], max: [1, 0.88, 0.55] } },
     ],
   }, [], ["fence", "railing"], "Post with two rails along x."),
-  s("truss", "트러스", { type: "subvoxel", size: 8, mask: trussMask() }, [], ["truss", "iron", "lattice"], "Open iron lattice cell: cube edges plus X braces."),
+  s("truss", "트러스", trussRecipe(), [], ["truss", "iron", "lattice"], "Open iron lattice cell: cube edges plus X braces on the four sides."),
   s("lattice", "창살", { type: "subvoxel", size: 8, mask: latticeMask() }, [], ["window", "grille"], "Thin vertical grille panel (x-y plane)."),
   s("pane", "판유리", { type: "box", min: [0, 0, 0.45], max: [1, 1, 0.55] }, [], ["window", "glass"], "Thin full pane in the x-y plane."),
-  s("leaves", "잎덩이", { type: "subvoxel", size: 8, mask: leavesMask() }, [], ["plant", "tree"], "Leafy block with small holes."),
+  s("leaves", "잎덩이", { type: "subvoxel", size: 4, mask: leavesMask() }, [], ["plant", "tree"], "Leafy block with small holes."),
   s("lamp_post", "가로등", {
     type: "composite", parts: [
       { recipe: { type: "box", min: [0.42, 0, 0.42], max: [0.58, 0.8, 0.58] } },

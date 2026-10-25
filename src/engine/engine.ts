@@ -110,7 +110,11 @@ export class Engine {
     };
     try {
       const result = def.run(ctx, parsed.data);
-      if (def.mutates) {
+      if (def.mutates && ctx.rollbackOnly) {
+        tx.rollback();
+        this.project.meta = JSON.parse(metaBefore) as ProjectMeta;
+        this.emit("change", cmd);
+      } else if (def.mutates) {
         this.refreshStructureBoxes(tx);
         if (tx.skippedOutOfBounds) warnings.push(`${tx.skippedOutOfBounds} block(s) outside project bounds were skipped`);
         const metaAfter = JSON.stringify(this.project.meta);

@@ -1,0 +1,334 @@
+{
+  "plan": "ai_test_house",
+  "newProject": true,
+  "name": "AI 테스트 하우스",
+  "title": "json house",
+  "description": "JSON 명령만으로 지은 2층 집.\nAI가 만든 경사 블록(ai.shingle)으로 지붕을 덮었다.",
+  "tags": [
+    "AI 전용 테스트",
+    "JSON 명령"
+  ],
+  "cellSize": 1,
+  "assets": [
+    {
+      "cmd": "createShape",
+      "args": {
+        "id": "ai.shingle",
+        "name": "턱 있는 지붕 경사",
+        "tags": [
+          "roof",
+          "slope",
+          "shingle"
+        ],
+        "description": "45도 경사 + 아래쪽 끝에 작은 턱이 있는 지붕널",
+        "recipe": {
+          "type": "extrude",
+          "axis": "x",
+          "profile": [
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              0.14
+            ],
+            [
+              0.86,
+              0.14
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "cmd": "createMaterial",
+      "args": {
+        "id": "ai.slate_blue",
+        "name": "청회색 슬레이트",
+        "kind": "tile",
+        "color": "#4c5a6e",
+        "tags": [
+          "roof"
+        ]
+      }
+    }
+  ],
+  "buildings": [
+    {
+      "name": "house",
+      "origin": [
+        0,
+        0,
+        0
+      ],
+      "structures": [
+        {
+          "key": "lawn",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "잔디",
+            "area": {
+              "at": [
+                -8,
+                0,
+                -8
+              ],
+              "size": [
+                34,
+                30
+              ]
+            },
+            "material": "grass",
+            "border": {
+              "material": "leaf_dark",
+              "width": 1
+            }
+          }
+        },
+        {
+          "key": "path",
+          "cmd": "createTerrain",
+          "args": {
+            "name": "현관 길",
+            "area": {
+              "at": [
+                8,
+                0,
+                12
+              ],
+              "size": [
+                2,
+                9
+              ]
+            },
+            "material": "paving",
+            "shape": "cube"
+          }
+        },
+        {
+          "key": "base",
+          "cmd": "createFoundation",
+          "args": {
+            "name": "기초",
+            "area": {
+              "at": [
+                0,
+                1,
+                0
+              ],
+              "size": [
+                18,
+                12
+              ]
+            },
+            "height": 1,
+            "material": "concrete"
+          }
+        },
+        {
+          "key": "walls1",
+          "cmd": "createWall",
+          "args": {
+            "name": "1층 벽",
+            "loop": {
+              "on": {
+                "ref": "base"
+              }
+            },
+            "height": 5,
+            "material": "brick",
+            "corners": "stone_light",
+            "openings": [
+              {
+                "side": "south",
+                "at": 8,
+                "width": 2,
+                "height": 3,
+                "bottom": 0,
+                "fill": null
+              }
+            ],
+            "windows": {
+              "width": 2,
+              "height": 2,
+              "bottom": 1,
+              "spacing": 2,
+              "margin": 2
+            },
+            "bands": [
+              {
+                "y": 4,
+                "material": "stone_light"
+              }
+            ]
+          }
+        },
+        {
+          "key": "floor2",
+          "cmd": "createFloor",
+          "args": {
+            "name": "2층 바닥",
+            "area": {
+              "on": {
+                "ref": "walls1"
+              }
+            },
+            "thickness": 1,
+            "material": "wood_oak",
+            "level": 2
+          }
+        },
+        {
+          "key": "walls2",
+          "cmd": "createWall",
+          "args": {
+            "name": "2층 벽",
+            "loop": {
+              "on": {
+                "ref": "floor2"
+              }
+            },
+            "height": 4,
+            "material": "plaster",
+            "corners": "wood_dark",
+            "windows": {
+              "width": 2,
+              "height": 2,
+              "bottom": 1,
+              "spacing": 3,
+              "margin": 2
+            }
+          }
+        },
+        {
+          "key": "roof",
+          "cmd": "createRoof",
+          "args": {
+            "name": "지붕",
+            "area": {
+              "on": {
+                "ref": "walls2"
+              }
+            },
+            "style": "gable",
+            "pitch": 1,
+            "overhang": 1,
+            "material": "ai.slate_blue",
+            "slopeShape": "ai.shingle",
+            "fillMaterial": "plaster"
+          }
+        },
+        {
+          "key": "chimney",
+          "cmd": "createPillar",
+          "args": {
+            "name": "굴뚝",
+            "at": [
+              14,
+              9,
+              3
+            ],
+            "height": 9,
+            "size": 2,
+            "material": "brick",
+            "capital": "stone_dark"
+          }
+        },
+        {
+          "key": "step",
+          "cmd": "createStairs",
+          "args": {
+            "name": "현관 계단",
+            "from": [
+              8,
+              1,
+              12
+            ],
+            "facing": "north",
+            "steps": 1,
+            "width": 2,
+            "material": "stone_light"
+          }
+        },
+        {
+          "key": "trees",
+          "cmd": "createTree",
+          "args": {
+            "name": "나무",
+            "positions": [
+              [
+                -4,
+                1,
+                -4
+              ],
+              [
+                22,
+                1,
+                -4
+              ],
+              [
+                -4,
+                1,
+                17
+              ],
+              [
+                23,
+                1,
+                16
+              ]
+            ],
+            "height": 4,
+            "crown": 2
+          }
+        },
+        {
+          "key": "fence_w",
+          "cmd": "createLine",
+          "args": {
+            "name": "울타리 서",
+            "from": [
+              -6,
+              1,
+              20
+            ],
+            "to": [
+              6,
+              1,
+              20
+            ],
+            "shape": "fence",
+            "material": "wood_dark"
+          }
+        },
+        {
+          "key": "fence_e",
+          "cmd": "createLine",
+          "args": {
+            "name": "울타리 동",
+            "from": [
+              11,
+              1,
+              20
+            ],
+            "to": [
+              24,
+              1,
+              20
+            ],
+            "shape": "fence",
+            "material": "wood_dark"
+          }
+        }
+      ]
+    }
+  ]
+}

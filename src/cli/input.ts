@@ -11,7 +11,10 @@ export function toRequests(input: unknown): CommandRequest[] {
   if (Array.isArray(input)) return input.map((x) => toRequest(x));
   if (input && typeof input === "object") {
     const o = input as Record<string, unknown>;
-    if (Array.isArray(o.buildings) || typeof o.plan === "string") return [{ cmd: "executePlan", args: o }];
+    if (Array.isArray(o.buildings) || typeof o.plan === "string") {
+      const pre: CommandRequest[] = o.newProject ? [{ cmd: "newProject", args: { name: (o.name as string) ?? (o.plan as string) ?? "plan", cellSize: (o.cellSize as number) ?? 1 } }] : [];
+      return [...pre, { cmd: "executePlan", args: o }];
+    }
     if (Array.isArray(o.commands) && !o.cmd) return (o.commands as unknown[]).map((x) => toRequest(x));
   }
   return [toRequest(input)];

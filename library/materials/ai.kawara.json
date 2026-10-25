@@ -1,0 +1,20 @@
+{
+  "id": "ai.kawara",
+  "name": "짙은 기와",
+  "kind": "tile",
+  "color": "#3e4652",
+  "opacity": 1,
+  "pattern": {
+    "type": "tile",
+    "contrast": 0.18
+  },
+  "variants": {
+    "count": 4,
+    "lightness": 0.07
+  },
+  "tags": [
+    "roof",
+    "japanese"
+  ],
+  "version": 1
+}

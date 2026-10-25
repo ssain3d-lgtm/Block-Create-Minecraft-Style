@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "vox": "tsx src/cli/index.ts",
     "check:studio": "tsx scripts/check-studio.ts",
-    "shot": "tsx scripts/shot-example.ts"
+    "shot": "tsx scripts/shot-example.ts",
+    "examples": "tsx scripts/write-examples.ts"
   },
   "dependencies": {
     "three": "^0.186.1",

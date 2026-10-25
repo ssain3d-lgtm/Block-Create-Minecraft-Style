@@ -1,0 +1,19 @@
+{
+  "id": "ai.slate_blue",
+  "name": "청회색 슬레이트",
+  "kind": "tile",
+  "color": "#4c5a6e",
+  "opacity": 1,
+  "pattern": {
+    "type": "tile",
+    "contrast": 0.18
+  },
+  "variants": {
+    "count": 4,
+    "lightness": 0.07
+  },
+  "tags": [
+    "roof"
+  ],
+  "version": 1
+}

@@ -1,5 +1,7 @@
 // Example projects reachable from the studio's "예제 불러오기" menu.
 import type { Engine, CommandResponse } from "../engine/engine";
+import { toRequests } from "../cli/input";
+import * as plans from "../../examples/plans";
 
 export interface Example {
   name: string;
@@ -55,7 +57,24 @@ export function buildShowcase(engine: Engine, log: (r: CommandResponse) => void 
   runAll(engine, cmds, log);
 }
 
+function planExample(name: string, make: () => unknown): Example {
+  return {
+    name,
+    build(engine, log) {
+      for (const req of toRequests(make())) {
+        const r = engine.execute(req);
+        log(r);
+        if (!r.ok) break;
+      }
+    },
+  };
+}
+
 export const EXAMPLES: Example[] = [
+  planExample("A. 에펠탑 (iron lace)", plans.eiffelPlan),
+  planExample("B. 일본 성곽", plans.castlePlan),
+  planExample("C. 비대칭 모던하우스", plans.modernPlan),
+  planExample("D. AI 테스트 하우스 (JSON 명령만)", plans.housePlan),
   { name: "작은 광장 (기본 명령 데모)", build: (e, log) => buildDemo(e, log) },
   { name: "형상·재질 견본 (AI 사용자 정의 블록 포함)", build: (e, log) => buildShowcase(e, log) },
 ];

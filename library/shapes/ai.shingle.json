@@ -1,0 +1,38 @@
+{
+  "id": "ai.shingle",
+  "name": "턱 있는 지붕 경사",
+  "recipe": {
+    "type": "extrude",
+    "profile": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        0.14
+      ],
+      [
+        0.86,
+        0.14
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    "axis": "x"
+  },
+  "solidFaces": [],
+  "tags": [
+    "roof",
+    "slope",
+    "shingle"
+  ],
+  "description": "45도 경사 + 아래쪽 끝에 작은 턱이 있는 지붕널",
+  "version": 1
+}
