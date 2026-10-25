@@ -1,0 +1,8 @@
+node_modules/
+dist/
+out/
+.vite/
+*.log
+shots/
+bench/results/*.tmp
+projects/

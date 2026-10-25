@@ -1,0 +1,11 @@
+export * from "./coords";
+export * from "./types";
+export { World } from "./world";
+export type { BlockData } from "./world";
+export { Project, CmdError, defaultMeta } from "./project";
+export type { ProjectFile } from "./project";
+export { Engine } from "./engine";
+export type { CommandRequest, CommandResponse } from "./engine";
+export { AssetRegistry } from "./assets/registry";
+export type { AssetStore } from "./assets/registry";
+export { BUILTIN_MATERIALS, BUILTIN_SHAPES } from "./assets/builtin";
