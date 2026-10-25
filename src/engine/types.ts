@@ -67,7 +67,7 @@ export type Recipe =
   | { type: "box"; min: Vec3; max: Vec3 }
   | { type: "extrude"; profile: [number, number][]; axis: "x" | "z"; from?: number; to?: number }
   | { type: "lathe"; profile: [number, number][]; segments?: number }
-  | { type: "curve"; profile: [number, number][]; path: [number, number][]; segments?: number; axis?: "x" | "z" }
+  | { type: "curve"; path: [number, number][]; thickness: number; axis?: "x" | "z"; from?: number; to?: number }
   | { type: "subvoxel"; size: number; mask: string[][] }
   | { type: "composite"; parts: { recipe: Recipe; offset?: Vec3; scale?: Vec3; yaw?: number }[] }
   | { type: "mesh"; positions: number[]; indices: number[] };

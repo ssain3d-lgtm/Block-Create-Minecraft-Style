@@ -9,7 +9,8 @@
     "build": "vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "vox": "tsx src/cli/index.ts"
+    "vox": "tsx src/cli/index.ts",
+    "check:studio": "tsx scripts/check-studio.ts"
   },
   "dependencies": {
     "three": "^0.186.1",
@@ -18,6 +19,7 @@
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/three": "^0.186.0",
+    "playwright": "^1.64.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",

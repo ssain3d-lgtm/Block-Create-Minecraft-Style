@@ -343,6 +343,30 @@ export const verifyReplay = defineCommand({
   summarize: (r) => (r.match ? `replay matches (${r.steps} steps)` : `REPLAY MISMATCH ${r.current} vs ${r.replayed}`),
 });
 
+export const setStructure = defineCommand({
+  name: "setStructure",
+  group: "structure",
+  description: "Change structure properties: name, visible (hide/show), locked (protect from edits), tags.",
+  schema: z.object({
+    id: z.string(),
+    name: z.string().optional(),
+    visible: z.boolean().optional(),
+    locked: z.boolean().optional(),
+    tags: z.array(z.string()).optional(),
+  }),
+  mutates: true,
+  example: { id: "s-3", visible: false },
+  run(ctx, a) {
+    const s = ctx.project.structure(a.id);
+    if (!s) throw new CmdError("UNKNOWN_STRUCTURE", `structure "${a.id}" not found`, "call getState");
+    if (a.name !== undefined) s.name = a.name;
+    if (a.visible !== undefined) s.visible = a.visible;
+    if (a.locked !== undefined) s.locked = a.locked;
+    if (a.tags !== undefined) s.tags = a.tags;
+    return { structureId: s.id, visible: s.visible, locked: s.locked };
+  },
+});
+
 export const deleteStructure = defineCommand({
   name: "deleteStructure",
   group: "structure",
