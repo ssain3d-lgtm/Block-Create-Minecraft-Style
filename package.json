@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "vox": "tsx src/cli/index.ts",
-    "check:studio": "tsx scripts/check-studio.ts"
+    "check:studio": "tsx scripts/check-studio.ts",
+    "shot": "tsx scripts/shot-example.ts"
   },
   "dependencies": {
     "three": "^0.186.1",

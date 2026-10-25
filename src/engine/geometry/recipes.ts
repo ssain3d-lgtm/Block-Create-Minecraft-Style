@@ -94,7 +94,10 @@ function curveInto(s: Soup, path: P2[], thickness: number, axis: "x" | "z", from
     left.push([p[0] + nx, p[1] + ny]);
     right.push([p[0] - nx, p[1] - ny]);
   }
-  extrudeInto(s, [...left, ...right.reverse()], axis, from, to);
+  // thick ends naturally poke out of the cell: clamp the outline into 0..1
+  const c = (v: number) => Math.min(1, Math.max(0, v));
+  const outline = [...left, ...right.reverse()].map(([u, v]) => [c(u), c(v)] as P2);
+  extrudeInto(s, outline, axis, from, to);
 }
 
 function subvoxelInto(s: Soup, size: number, mask: string[][]) {
@@ -202,7 +205,7 @@ export function validateGeometry(g: GeometryData): string[] {
 
 const cache = new Map<string, GeometryData>();
 export function geometryFor(def: ShapeDef): GeometryData {
-  const key = `${def.id}@${def.version ?? 1}`;
+  const key = `${def.id}@${def.version ?? 1}@${JSON.stringify(def.recipe).length}`;
   let g = cache.get(key);
   if (!g) { g = buildGeometry(def.recipe); cache.set(key, g); }
   return g;

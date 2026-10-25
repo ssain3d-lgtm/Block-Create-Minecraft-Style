@@ -70,7 +70,7 @@ export function buildPalette(p: Project): PaletteInfo {
     matVarCount[i] = Math.max(1, Math.min(8, def?.variants?.count ?? 4));
   });
   const hidden = new Set(p.meta.structures.filter((s) => !s.visible).map((s) => s.num));
-  const assetKey = JSON.stringify([p.meta.assets.materials.map((m) => [m.id, m.version, m.color, m.opacity]), p.meta.assets.shapes.map((s) => [s.id, s.version])]);
+  const assetKey = JSON.stringify([p.meta.assets.materials.map((m) => [m.id, m.version, m.color, m.opacity]), p.meta.assets.shapes.map((s) => [s.id, s.version, JSON.stringify(s.recipe).length])]);
   return {
     key: `${shapes.join("|")}#${mats.join("|")}#${[...hidden].join(",")}#${assetKey}`,
     shapeIds: shapes, shapeIsCube, shapeSolid, matColor, matAlpha, matBucket, matPattern, matVarLight, matVarCount, hidden,

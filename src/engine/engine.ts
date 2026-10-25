@@ -29,6 +29,8 @@ const HISTORY_LIMIT = 200;
 const HISTORY_CELL_BUDGET = 4_000_000;
 
 export interface EngineOptions {
+  /** replay engines rebuild from a log: they never write to the shared library */
+  replaying?: boolean;
   host?: Host;
   library?: AssetStore;
   assets?: AssetRegistry;
@@ -48,8 +50,10 @@ export class Engine {
   private listeners = new Set<(e: { type: string; cmd?: string }) => void>();
   /** last edit apply time in ms (shown in the status bar) */
   lastEditMs = 0;
+  readonly replaying: boolean;
 
   constructor(opts: EngineOptions = {}) {
+    this.replaying = !!opts.replaying;
     this.assets = opts.assets ?? new AssetRegistry(opts.library);
     this.host = opts.host;
     this.project = new Project(this.assets);
@@ -237,7 +241,7 @@ export class Engine {
 
   /** Builds a fresh project from a command log (deterministic). */
   static replay(log: LogEntry[], assets: AssetRegistry, settings?: ProjectMeta["settings"], projectAssets?: ProjectMeta["assets"]): Project {
-    const e = new Engine({ assets });
+    const e = new Engine({ assets, replaying: true });
     if (settings) e.project.meta.settings = structuredClone(settings);
     // assets referenced by the log must be resolvable even if the shared library is gone
     if (projectAssets) e.project.meta.assets = structuredClone(projectAssets);

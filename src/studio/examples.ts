@@ -31,6 +31,31 @@ export function buildDemo(engine: Engine, log: (r: CommandResponse) => void = ()
   ], log);
 }
 
+/** Every builtin shape in four orientations + an AI-made custom block, on a plinth. */
+export function buildShowcase(engine: Engine, log: (r: CommandResponse) => void = () => {}) {
+  engine.execute({ cmd: "newProject", args: { name: "형상 견본", cellSize: 1 } });
+  const shapes = engine.assets.builtinShapes_().map((s) => s.id);
+  const mats = ["iron_lower", "stone_light", "brick", "wood_oak", "roof_tile", "concrete", "glass", "leaf"];
+  const cmds: { cmd: string; args: unknown }[] = [
+    { cmd: "setProjectInfo", args: { title: "shapes & materials", description: "내장 형상 전부와 AI가 만든 사용자 정의 블록.\n각 줄은 북·동·남·서 네 방향.", tags: ["견본"] } },
+    { cmd: "fillRegion", args: { from: [-2, -1, -2], to: [shapes.length * 3 + 2, -1, 18], material: "paving", structure: { name: "바닥", type: "terrain" } } },
+    { cmd: "createShape", args: { id: "ai.curved_tile", name: "곡선 기와", tags: ["roof", "tile", "curved"], recipe: { type: "curve", axis: "x", thickness: 0.16, path: [[0, 0.95], [0.25, 0.78], [0.5, 0.55], [0.75, 0.3], [1, 0.1]] } } },
+    { cmd: "createShape", args: { id: "ai.round_column", name: "둥근 기둥", tags: ["column"], recipe: { type: "lathe", segments: 14, profile: [[0.42, 0], [0.42, 0.12], [0.3, 0.18], [0.3, 0.82], [0.42, 0.88], [0.42, 1]] } } },
+    { cmd: "createMaterial", args: { id: "ai.kawara_gray", name: "회색 기와", kind: "tile", color: "#56606e" } },
+  ];
+  shapes.forEach((id, i) => {
+    for (let k = 0; k < 4; k++) {
+      cmds.push({ cmd: "editBlocks", args: { ops: [{ op: "set", at: [i * 3, 0, k * 3], shape: id, material: mats[(i + k) % mats.length], facing: ["north", "east", "south", "west"][k] }] } });
+    }
+  });
+  cmds.push({ cmd: "fillRegion", args: { from: [0, 0, 13], to: [8, 0, 13], shape: "ai.curved_tile", material: "ai.kawara_gray", facing: "north", structure: { name: "AI 곡선 기와", type: "roof" } } });
+  cmds.push({ cmd: "fillRegion", args: { from: [0, 1, 14], to: [8, 1, 14], shape: "ai.curved_tile", material: "ai.kawara_gray", facing: "north", structure: "AI 곡선 기와" } });
+  cmds.push({ cmd: "fillRegion", args: { from: [12, 0, 14], to: [12, 3, 14], shape: "ai.round_column", material: "stone_light", structure: { name: "AI 둥근 기둥", type: "column" } } });
+  cmds.push({ cmd: "fillRegion", args: { from: [16, 0, 14], to: [16, 3, 14], shape: "ai.round_column", material: "stone_light", structure: "AI 둥근 기둥" } });
+  runAll(engine, cmds, log);
+}
+
 export const EXAMPLES: Example[] = [
   { name: "작은 광장 (기본 명령 데모)", build: (e, log) => buildDemo(e, log) },
+  { name: "형상·재질 견본 (AI 사용자 정의 블록 포함)", build: (e, log) => buildShowcase(e, log) },
 ];

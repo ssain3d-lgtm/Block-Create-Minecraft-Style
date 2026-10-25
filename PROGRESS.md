@@ -3,7 +3,7 @@
 > 세션이 끊기면 이 파일부터 읽고 "다음 작업"부터 이어간다. 설계 기준은 `DESIGN.md`.
 
 ## 현재 단계
-2단계 — 화면 / 완료 (다음: 3단계 자산 팩토리)
+3단계 — 자산 팩토리 / 완료 (다음: 4단계 생성기·플랜)
 
 ## 완료
 - [x] World/Chunk(16³, 희소 저장, 구조물 인덱스, dirty 청크 표시) — `test/engine.test.ts`
@@ -24,11 +24,16 @@
 - [x] 브라우저 실동작 검사 `npm run check:studio` (Chromium + Playwright): 추가/삭제 클릭, Ctrl+Z, AI 명령, 새로고침 복원 모두 통과
 - [x] `run.bat`(ASCII 전용)
 
+- [x] 자산 명령: searchAssets, describeAsset, createShape, createMaterial, createCustomBlock, createComponent, placeComponent(회전·반복), registerAsset — `test/assets.test.ts`
+- [x] 공용 라이브러리: Node는 `library/{shapes,materials,components}/*.json`, 브라우저는 localStorage. 프로젝트는 사용한 자산 사본을 저장(라이브러리 없이도 열림)
+- [x] AI 테스트 D 일부: 새 경사 블록 생성 → 등록 → 다른 프로젝트에서 검색·재사용 → 수정(v2) → 원래 프로젝트는 v1 유지 → 재실행 검증
+- [x] 형상 검증: 칸 밖 좌표·NaN·삼각형 수 초과 거부(hint 포함), 곡선은 칸 안으로 자동 맞춤, solidFaces 자동 감지(box/subvoxel)
+- [x] 스튜디오 예제 "형상·재질 견본" — 내장 형상 17종 × 4방향 + AI 곡선 기와·둥근 기둥
+
 ## 진행 중
 - (없음)
 
 ## 미완료
-- [ ] 3단계 자산 팩토리(createShape/createMaterial/createComponent/searchAssets, 라이브러리 등록·재사용)
 - [ ] 4단계 생성기·플랜 / 5단계 성능 / 6단계 AI 연결·검수
 
 ## 실행 방법
@@ -44,7 +49,7 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 (아직 없음 — 추정치는 쓰지 않는다)
 
 ## 다음 작업 (재개 시 여기부터)
-1. 3단계: 자산 명령(createShape, createMaterial, createComponent, placeComponent, searchAssets, registerAsset), Node `library/` 폴더 저장, 스튜디오 팔레트에 반영
+1. 4단계: 고수준 생성기(createBuilding/Foundation/Floor/Wall/Roof/Tower/Arch/Truss/Pillar/Beam/Stairs/Terrain/Tree), 앵커 참조, executePlan(dry-run), modify/rebuild/duplicate, 예제 D(집)·A(에펠탑)
 
 ## 결정 기록
 - 2026-10-26: npm workspaces 대신 **단일 패키지 + 폴더 분리**(`src/engine`, `src/render`, `src/studio`, `src/cli`, `src/node`, `src/server`). Windows에서 설치·실행이 단순해서. `src/engine`은 three/node 모듈을 import하지 않는다(브라우저·Node 공용).
@@ -52,4 +57,5 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 - 2026-10-26: 셀 키는 36비트 정수(좌표 ±2048), 기본 경계 x,z ±1024 / y -64~1023.
 - 2026-10-26: Greedy Meshing은 보류. 블록마다 색 흔들림·텍스처 변형이 있어 합칠 수 있는 면이 적고, 숨은 면 제거만으로 면 수가 크게 줄어든다. 5단계 실측 후 필요하면 같은 색 면만 합치는 방식으로 추가.
 - 2026-10-26: 브라우저 검사는 시스템 Chromium + SwiftShader(소프트웨어 GL)로 돈다. 이 환경의 FPS는 GPU 성능이 아니므로 성능 수치로 쓰지 않는다.
+- 2026-10-26: 자산 버전은 프로젝트 기준으로 매긴다(재실행 시 결정적). 재실행 엔진은 라이브러리에 쓰지 않는다.
 - 2026-10-26: zod v4 사용, JSON Schema는 `z.toJSONSchema`로 생성.

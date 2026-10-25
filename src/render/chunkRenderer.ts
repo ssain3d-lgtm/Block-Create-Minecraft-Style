@@ -23,6 +23,19 @@ function injectInstanceTile(mat: THREE.Material, span: [number, number]) {
   mat.customProgramCacheKey = () => "inst-tile";
 }
 
+const recipeKeys = new WeakMap<object, string>();
+function recipeKey(r: object): string {
+  let k = recipeKeys.get(r);
+  if (!k) {
+    const s = JSON.stringify(r);
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
+    k = `${s.length}.${(h >>> 0).toString(36)}`;
+    recipeKeys.set(r, k);
+  }
+  return k;
+}
+
 export class ChunkRenderer {
   readonly root = new THREE.Group();
   readonly atlas = createAtlasTexture();
@@ -77,7 +90,7 @@ export class ChunkRenderer {
     const p = this.getProject();
     const id = p.shapeId(shapeIdx);
     const def = p.assets.findShape(id, p.meta.assets.shapes);
-    const key = `${id}@${def?.version ?? 0}`;
+    const key = `${id}@${def?.version ?? 0}@${def ? recipeKey(def.recipe) : ""}`;
     let g = this.shapeGeoms.get(key);
     if (!g) {
       g = new THREE.BufferGeometry();

@@ -57,7 +57,7 @@ export interface MaterialDef {
   metalness?: number;
   opacity?: number;
   emissive?: string;
-  pattern?: { type: "noise" | "grain" | "brick" | "tile" | "plank" | "grid" | "none"; scale?: number; contrast?: number };
+  pattern?: { type: "noise" | "grain" | "brick" | "tile" | "plank" | "grid" | "none" | "leaf"; scale?: number; contrast?: number };
   variants?: { count: number; lightness: number };
   tags?: string[];
   version?: number;
