@@ -12,6 +12,15 @@ AI가 블록 좌표를 하나하나 쓸 필요가 없습니다.
 
 <sub>두 그림 모두 이 프로그램이 `examples/`의 플랜(JSON 명령)만으로 지은 결과입니다. 목표로 삼은 레퍼런스 화면은 `docs/ref/`에 있습니다.</sub>
 
+## 결과물 예시
+
+| | | |
+|---|---|---|
+| ![해 질 녘 에펠탑](assets/showcase/eiffel-dusk.png) | ![에펠탑 다리](assets/showcase/eiffel-legs.png) | ![일본 성곽](assets/showcase/castle.png) |
+| ![모던하우스](assets/showcase/modern-house.png) | ![AI 테스트 하우스](assets/showcase/ai-test-house.png) | ![다중 셀 정자](assets/showcase/pavilion-overview.png) |
+
+더 보기: [`assets/showcase/`](assets/showcase/)
+
 ## 바로 실행 (Windows)
 
 1. [Node.js](https://nodejs.org) 20 이상을 설치합니다.

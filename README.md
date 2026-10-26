@@ -12,6 +12,15 @@ so it never has to write block coordinates one by one.
 
 <sub>Both images were built by this program from the plans (JSON commands) in `examples/`. The reference screenshots the project started from are in `docs/ref/`.</sub>
 
+## Gallery
+
+| | | |
+|---|---|---|
+| ![Eiffel at dusk](assets/showcase/eiffel-dusk.png) | ![Eiffel legs](assets/showcase/eiffel-legs.png) | ![Japanese castle](assets/showcase/castle.png) |
+| ![Modern house](assets/showcase/modern-house.png) | ![AI test house](assets/showcase/ai-test-house.png) | ![Multi-cell pavilion](assets/showcase/pavilion-overview.png) |
+
+More: [`assets/showcase/`](assets/showcase/)
+
 ## Quick start (Windows)
 
 1. Install [Node.js](https://nodejs.org) 20 or newer.
