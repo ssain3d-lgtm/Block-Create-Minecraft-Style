@@ -1,17 +1,15 @@
 // Turns mesher output into Three.js objects and keeps them in sync with the world.
-// Incremental: only dirty chunks are re-meshed, with a per-frame time budget.
+//  - incremental: only dirty chunks are re-meshed, with a per-frame time budget
+//  - region batching: the meshes of 2x2x2 chunks (32^3 cells) are merged into one draw call per
+//    bucket and one InstancedMesh per (shape, bucket), which cuts draw calls ~5-8x
 import * as THREE from "three";
 import type { Project } from "../engine/project";
 import { geometryFor } from "../engine/geometry/recipes";
 import { buildPalette, PaletteInfo, BUCKET_GLOW, BUCKET_TRANSPARENT } from "./palette";
-import { meshChunk, ChunkMeshData, tileUV } from "./mesher";
+import { meshChunk, ChunkMeshData, tileUV, BucketMesh } from "./mesher";
 import { createAtlasTexture } from "./atlas";
 
-interface ChunkObjects {
-  group: THREE.Group;
-  total: number;
-  visible: number;
-}
+export const REGION = 2; // chunks per region side
 
 function injectInstanceTile(mat: THREE.Material, span: [number, number]) {
   mat.onBeforeCompile = (shader) => {
@@ -36,14 +34,43 @@ function recipeKey(r: object): string {
   return k;
 }
 
+function regionKeyOf(chunkKey: string) {
+  const [cx, cy, cz] = chunkKey.split(",").map(Number);
+  return `${Math.floor(cx / REGION)},${Math.floor(cy / REGION)},${Math.floor(cz / REGION)}`;
+}
+
+function mergeBuckets(list: BucketMesh[]): BucketMesh {
+  let nv = 0, ni = 0;
+  for (const b of list) { nv += b.positions.length / 3; ni += b.indices.length; }
+  const out: BucketMesh = {
+    positions: new Float32Array(nv * 3), normals: new Float32Array(nv * 3), uvs: new Float32Array(nv * 2),
+    colors: new Float32Array(nv * 4), indices: new Uint32Array(ni),
+  };
+  let v = 0, i = 0;
+  for (const b of list) {
+    out.positions.set(b.positions, v * 3);
+    out.normals.set(b.normals, v * 3);
+    out.uvs.set(b.uvs, v * 2);
+    out.colors.set(b.colors, v * 4);
+    for (let k = 0; k < b.indices.length; k++) out.indices[i + k] = b.indices[k] + v;
+    v += b.positions.length / 3;
+    i += b.indices.length;
+  }
+  return out;
+}
+
 export class ChunkRenderer {
   readonly root = new THREE.Group();
   readonly atlas = createAtlasTexture();
   readonly mats: THREE.Material[];
   readonly instMats: THREE.Material[];
-  private chunks = new Map<string, ChunkObjects>();
+  private chunkData = new Map<string, ChunkMeshData>();
+  private regions = new Map<string, THREE.Group>();
+  private dirtyRegions = new Set<string>();
   private shapeGeoms = new Map<string, THREE.BufferGeometry>();
   private pal: PaletteInfo | null = null;
+  /** set when project meta may have changed (palette, materials, visibility) */
+  paletteDirty = true;
   shadows = true;
   totalBlocks = 0;
   visibleBlocks = 0;
@@ -68,9 +95,14 @@ export class ChunkRenderer {
 
   /** Call after a project load/replace: drop every chunk. */
   reset() {
-    for (const c of this.chunks.values()) this.disposeGroup(c.group);
-    this.chunks.clear();
+    for (const g of this.regions.values()) this.disposeGroup(g);
+    this.regions.clear();
+    this.chunkData.clear();
+    this.dirtyRegions.clear();
+    this.totalBlocks = 0;
+    this.visibleBlocks = 0;
     this.pal = null;
+    this.paletteDirty = true;
     const w = this.getProject().world;
     for (const k of w.chunks.keys()) w.dirty.add(k);
   }
@@ -78,11 +110,10 @@ export class ChunkRenderer {
   private disposeGroup(g: THREE.Group) {
     this.root.remove(g);
     g.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) {
-        const mesh = o as THREE.Mesh;
-        mesh.geometry.dispose();
-        if ((mesh as THREE.InstancedMesh).isInstancedMesh) (mesh as THREE.InstancedMesh).dispose();
-      }
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      mesh.geometry.dispose();
+      if ((mesh as THREE.InstancedMesh).isInstancedMesh) (mesh as THREE.InstancedMesh).dispose();
     });
   }
 
@@ -110,28 +141,41 @@ export class ChunkRenderer {
     return g;
   }
 
-  invalidateShape(id: string) {
-    for (const k of [...this.shapeGeoms.keys()]) if (k.startsWith(id + "@")) { this.shapeGeoms.get(k)!.dispose(); this.shapeGeoms.delete(k); }
-  }
-
-  /** Re-mesh dirty chunks for up to budgetMs. Returns number of chunks still pending. */
+  /** Re-mesh dirty chunks for up to budgetMs, then rebuild touched regions. Returns chunks still pending. */
   update(budgetMs = 8): number {
     const p = this.getProject();
     const w = p.world;
-    const pal = buildPalette(p);
-    if (!this.pal || this.pal.key !== pal.key) {
-      // palette/material/visibility change -> everything must be re-meshed
-      for (const k of this.chunks.keys()) w.dirty.add(k);
-      for (const k of w.chunks.keys()) w.dirty.add(k);
+    if (this.paletteDirty || !this.pal) {
+      const pal = buildPalette(p);
+      if (!this.pal || this.pal.key !== pal.key) {
+        // palette / material / visibility change -> everything is re-meshed
+        for (const k of this.chunkData.keys()) w.dirty.add(k);
+        for (const k of w.chunks.keys()) w.dirty.add(k);
+      }
       this.pal = pal;
+      this.paletteDirty = false;
     }
     const t0 = performance.now();
     for (const key of w.dirty) {
       w.dirty.delete(key);
       const [cx, cy, cz] = key.split(",").map(Number);
       const data = meshChunk(w, cx, cy, cz, this.pal);
-      this.apply(data);
+      const old = this.chunkData.get(key);
+      if (old) { this.totalBlocks -= old.total; this.visibleBlocks -= old.visible; }
+      if (data.total) {
+        this.chunkData.set(key, data);
+        this.totalBlocks += data.total;
+        this.visibleBlocks += data.visible;
+      } else this.chunkData.delete(key);
+      if (old || data.total) this.dirtyRegions.add(regionKeyOf(key));
       if (performance.now() - t0 > budgetMs) break;
+    }
+    // rebuild regions only when their chunk queue is drained (avoids rebuilding a region 8 times)
+    const pendingRegions = new Set([...w.dirty].map(regionKeyOf));
+    for (const rk of this.dirtyRegions) {
+      if (pendingRegions.has(rk)) continue;
+      this.buildRegion(rk);
+      this.dirtyRegions.delete(rk);
     }
     this.pending = w.dirty.size;
     return this.pending;
@@ -139,22 +183,27 @@ export class ChunkRenderer {
 
   /** Synchronously mesh everything (used by screenshots and benchmarks). */
   flush() {
-    while (this.update(1e9) > 0) { /* loop */ }
+    while (this.update(1e9) > 0 || this.dirtyRegions.size > 0) { /* loop */ }
   }
 
-  private apply(d: ChunkMeshData) {
-    const old = this.chunks.get(d.key);
-    if (old) {
-      this.totalBlocks -= old.total;
-      this.visibleBlocks -= old.visible;
-      this.disposeGroup(old.group);
-      this.chunks.delete(d.key);
-    }
-    if (d.total === 0) return;
+  private buildRegion(rk: string) {
+    const old = this.regions.get(rk);
+    if (old) { this.disposeGroup(old); this.regions.delete(rk); }
+    const [rx, ry, rz] = rk.split(",").map(Number);
+    const parts: ChunkMeshData[] = [];
+    for (let dx = 0; dx < REGION; dx++)
+      for (let dy = 0; dy < REGION; dy++)
+        for (let dz = 0; dz < REGION; dz++) {
+          const d = this.chunkData.get(`${rx * REGION + dx},${ry * REGION + dy},${rz * REGION + dz}`);
+          if (d) parts.push(d);
+        }
+    if (!parts.length) return;
     const group = new THREE.Group();
-    group.name = `chunk ${d.key}`;
-    d.buckets.forEach((b, bi) => {
-      if (!b) return;
+    group.name = `region ${rk}`;
+    for (let bi = 0; bi < 3; bi++) {
+      const list = parts.map((p) => p.buckets[bi]).filter((b): b is BucketMesh => !!b);
+      if (!list.length) continue;
+      const b = list.length === 1 ? list[0] : mergeBuckets(list);
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.BufferAttribute(b.positions, 3));
       g.setAttribute("normal", new THREE.BufferAttribute(b.normals, 3));
@@ -166,33 +215,42 @@ export class ChunkRenderer {
       mesh.castShadow = this.shadows && bi !== BUCKET_TRANSPARENT;
       mesh.receiveShadow = this.shadows && bi !== BUCKET_GLOW;
       if (bi === BUCKET_TRANSPARENT) mesh.renderOrder = 2;
-      mesh.userData.chunk = d.key;
       group.add(mesh);
-    });
-    for (const inst of d.instances) {
-      const geo = this.shapeGeometry(inst.shape);
+    }
+    // merge instance groups of the same (shape, bucket)
+    const inst = new Map<number, { shape: number; bucket: number; m: Float32Array[]; c: Float32Array[]; t: Float32Array[]; n: number }>();
+    for (const p of parts)
+      for (const g of p.instances) {
+        const k = g.shape * 4 + g.bucket;
+        let e = inst.get(k);
+        if (!e) { e = { shape: g.shape, bucket: g.bucket, m: [], c: [], t: [], n: 0 }; inst.set(k, e); }
+        e.m.push(g.matrices); e.c.push(g.colors); e.t.push(g.tiles); e.n += g.count;
+      }
+    const cat = (arrs: Float32Array[]) => {
+      if (arrs.length === 1) return arrs[0];
+      const out = new Float32Array(arrs.reduce((n, a) => n + a.length, 0));
+      let o = 0;
+      for (const a of arrs) { out.set(a, o); o += a.length; }
+      return out;
+    };
+    for (const e of inst.values()) {
+      const geo = this.shapeGeometry(e.shape);
       if (!geo.getAttribute("position")) continue;
-      const mesh = new THREE.InstancedMesh(geo, this.instMats[inst.bucket], inst.count);
-      mesh.instanceMatrix.set(inst.matrices);
-      mesh.instanceColor = new THREE.InstancedBufferAttribute(inst.colors, 3);
-      // per-instance atlas tile (custom attribute read by the injected shader code)
-      const tiles = new THREE.InstancedBufferAttribute(inst.tiles, 2);
-      // light geometry wrapper: shares the cached shape attributes, adds the per-instance tile
-      const g2 = new THREE.BufferGeometry();
+      const g2 = new THREE.BufferGeometry(); // light wrapper sharing the cached shape attributes
       for (const name of ["position", "normal", "uv"]) g2.setAttribute(name, geo.getAttribute(name));
       g2.setIndex(geo.getIndex());
-      g2.setAttribute("instTile", tiles);
-      mesh.geometry = g2;
+      g2.setAttribute("instTile", new THREE.InstancedBufferAttribute(cat(e.t), 2));
+      const mesh = new THREE.InstancedMesh(g2, this.instMats[e.bucket], e.n);
+      mesh.instanceMatrix.set(cat(e.m));
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(cat(e.c), 3);
       mesh.computeBoundingSphere();
-      mesh.castShadow = this.shadows && inst.bucket !== BUCKET_TRANSPARENT;
+      mesh.castShadow = this.shadows && e.bucket !== BUCKET_TRANSPARENT;
       mesh.receiveShadow = this.shadows;
-      if (inst.bucket === BUCKET_TRANSPARENT) mesh.renderOrder = 2;
+      if (e.bucket === BUCKET_TRANSPARENT) mesh.renderOrder = 2;
       group.add(mesh);
     }
     this.root.add(group);
-    this.chunks.set(d.key, { group, total: d.total, visible: d.visible });
-    this.totalBlocks += d.total;
-    this.visibleBlocks += d.visible;
+    this.regions.set(rk, group);
   }
 
   setShadows(on: boolean) {
@@ -207,8 +265,8 @@ export class ChunkRenderer {
   }
 
   stats() {
-    let drawObjects = 0;
-    this.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) drawObjects++; });
-    return { chunks: this.chunks.size, meshes: drawObjects, total: this.totalBlocks, visible: this.visibleBlocks, pending: this.pending };
+    let meshes = 0;
+    this.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes++; });
+    return { chunks: this.chunkData.size, regions: this.regions.size, meshes, total: this.totalBlocks, visible: this.visibleBlocks, pending: this.pending };
   }
 }

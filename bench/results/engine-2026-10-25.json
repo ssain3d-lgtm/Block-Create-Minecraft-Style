@@ -1,0 +1,78 @@
+{
+  "kind": "engine (CPU, Node)",
+  "env": {
+    "node": "v22.23.4",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 2,
+    "platform": "linux 6.18.44-fc-v153",
+    "date": "2026-10-25T23:59:02.588Z"
+  },
+  "results": [
+    {
+      "scene": "synthetic-100k",
+      "blocks": 100216,
+      "chunks": 132,
+      "buildMs": 183,
+      "meshAllMs": 286,
+      "meshPerChunkMs": 2.17,
+      "cubeQuads": 142208,
+      "cubeTriangles": 284416,
+      "instances": 30228,
+      "instanceGroups": 226,
+      "visibleBlocks": 100216,
+      "fileBytes": 1178666,
+      "saveMs": 88,
+      "loadMs": 43,
+      "edit1000": {
+        "commandMs": 10.7,
+        "remeshChunks": 8,
+        "remeshMs": 6.4,
+        "undoMs": 1.4
+      }
+    },
+    {
+      "scene": "synthetic-300k",
+      "blocks": 300112,
+      "chunks": 324,
+      "buildMs": 370,
+      "meshAllMs": 583,
+      "meshPerChunkMs": 1.8,
+      "cubeQuads": 428440,
+      "cubeTriangles": 856880,
+      "instances": 89232,
+      "instanceGroups": 761,
+      "visibleBlocks": 300112,
+      "fileBytes": 3517946,
+      "saveMs": 319,
+      "loadMs": 65,
+      "edit1000": {
+        "commandMs": 6.8,
+        "remeshChunks": 8,
+        "remeshMs": 6.6,
+        "undoMs": 0.6
+      }
+    },
+    {
+      "scene": "eiffel",
+      "blocks": 121892,
+      "chunks": 497,
+      "buildMs": 341,
+      "meshAllMs": 334,
+      "meshPerChunkMs": 0.67,
+      "cubeQuads": 177924,
+      "cubeTriangles": 355848,
+      "instances": 10991,
+      "instanceGroups": 222,
+      "visibleBlocks": 111235,
+      "fileBytes": 2033275,
+      "saveMs": 162,
+      "loadMs": 89,
+      "edit1000": {
+        "commandMs": 7.2,
+        "remeshChunks": 8,
+        "remeshMs": 9.9,
+        "undoMs": 0.7
+      }
+    }
+  ]
+}

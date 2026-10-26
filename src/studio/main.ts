@@ -7,6 +7,7 @@ import { toRequests } from "../cli/input";
 import { Viewport, ViewPreset, Ambience } from "./viewport";
 import { idbGet, idbPut, localStorageLibrary, downloadText, pickFile } from "./storage";
 import { buildDemo, EXAMPLES } from "./examples";
+import { runBench, showBenchPanel } from "./bench";
 
 type Mode = "view" | "add" | "remove" | "paint";
 
@@ -451,5 +452,14 @@ async function boot() {
   renderSide();
   updateHelp();
   if (restored) toast("마지막 작업을 불러왔습니다");
+  const bench = new URLSearchParams(location.search).get("bench");
+  if (bench !== null) {
+    const ids = bench && bench !== "1" ? bench.split(",") : null;
+    const secs = Number(new URLSearchParams(location.search).get("seconds") ?? 10);
+    const data = await runBench(engine, viewport, ids, secs, (msg) => { $("helptext").textContent = "벤치마크 · " + msg; });
+    (window as unknown as { __bench: unknown }).__bench = data;
+    showBenchPanel($("view"), data);
+    renderSide();
+  }
 }
 boot();

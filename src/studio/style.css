@@ -105,3 +105,11 @@ textarea.cmd { width: 100%; height: 110px; resize: vertical; border: 1px solid v
 
 .view.dark .tag, .view.dark .helptext, .view.dark .compass { color: #dfe6f2; }
 .view.dark .tag em { border-color: #6b7a96; color: #c2cbe0; }
+
+.benchpanel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; border: 1px solid var(--line-strong); border-radius: 8px; padding: 18px 22px; box-shadow: 0 8px 40px rgba(0,0,0,.15); font-size: 12px; z-index: 5; max-width: 92%; }
+.benchpanel h3 { margin: 0 0 6px; font-size: 15px; }
+.benchpanel p { color: var(--ink-2); margin: 0 0 10px; }
+.benchpanel table { border-collapse: collapse; margin-bottom: 12px; }
+.benchpanel td, .benchpanel th { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: right; white-space: nowrap; }
+.benchpanel td:first-child, .benchpanel th:first-child { text-align: left; }
+.benchpanel button { border: 1px solid var(--line-strong); background: #fff; border-radius: 4px; padding: 6px 12px; cursor: pointer; }

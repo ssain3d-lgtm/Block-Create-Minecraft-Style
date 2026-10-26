@@ -73,6 +73,8 @@ export class Viewport {
 
     this.chunks = new ChunkRenderer(() => this.engine.project);
     this.scene.add(this.chunks.root);
+    // meta (palette, materials, visibility) may change with any command
+    engine.onChange(() => (this.chunks.paletteDirty = true));
 
     const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(1.02, 1.02, 1.02));
     this.highlight = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: "#1f5e4c", depthTest: false, transparent: true, opacity: 0.9 }));

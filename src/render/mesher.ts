@@ -145,7 +145,7 @@ export function meshChunk(world: World, cx: number, cy: number, cz: number, pal:
         if (!s) continue;
         total++;
         const m = material[i];
-        const bucket = pal.matBucket[m];
+        const bucket = pal.matBucket[m] ?? 0; // stale palette (new material) falls back to opaque
         const wx = ox + lx, wy = oy + ly, wz = oz + lz;
         const h = hash3(wx, wy, wz);
         const vc = pal.matVarCount[m];

@@ -1,0 +1,63 @@
+{
+  "env": {
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+    "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "vendor": "Google Inc. (Google)",
+    "screen": "1158x858 @1x",
+    "shadows": true,
+    "three": "186",
+    "date": "2026-10-26T00:02:50.420Z",
+    "mode": "software (SwiftShader) - not a GPU measurement"
+  },
+  "seconds": 5,
+  "results": [
+    {
+      "scene": "synthetic-100k",
+      "blocks": 100216,
+      "visible": 100216,
+      "buildMs": 165,
+      "meshMs": 626,
+      "firstFrameMs": 5670,
+      "fpsAvg": 0.4,
+      "fpsLow1": 0.2,
+      "frameMsMax": 4349.8,
+      "drawCalls": 441,
+      "triangles": 3050706,
+      "meshes": 235,
+      "edit1000Ms": 17167,
+      "heapMB": 106
+    },
+    {
+      "scene": "synthetic-300k",
+      "blocks": 300112,
+      "visible": 300112,
+      "buildMs": 441,
+      "meshMs": 1635,
+      "firstFrameMs": 6829,
+      "fpsAvg": 0.2,
+      "fpsLow1": 0.1,
+      "frameMsMax": 12366.2,
+      "drawCalls": 1191,
+      "triangles": 8973202,
+      "meshes": 635,
+      "edit1000Ms": 35037,
+      "heapMB": 245
+    },
+    {
+      "scene": "eiffel",
+      "blocks": 121892,
+      "visible": 111235,
+      "buildMs": 442,
+      "meshMs": 536,
+      "firstFrameMs": 12127,
+      "fpsAvg": 0.9,
+      "fpsLow1": 0.5,
+      "frameMsMax": 1899.9,
+      "drawCalls": 469,
+      "triangles": 1395688,
+      "meshes": 235,
+      "edit1000Ms": 7237,
+      "heapMB": 209
+    }
+  ]
+}
