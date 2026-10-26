@@ -3,6 +3,7 @@ import { z } from "zod";
 import { FACINGS, Facing, Vec3 } from "../coords";
 import { CmdError, defineCommand, zFacing } from "./framework";
 import { Builder, defineGenerator, FACING_VEC, facingFromVec, Rect, zCommon, zFootprint, zPos } from "./builder";
+import { ROOF_Q, roofPieceId, RoofPieceType } from "../geometry/roofPiece";
 
 const zInt = z.number().int();
 
@@ -241,98 +242,176 @@ export const createWall = defineGenerator({
 });
 
 // ---------------- roof ----------------
+const zRoof = z.object({
+  ...zCommon,
+  area: zFootprint,
+  style: z.enum(["gable", "hip", "pyramid", "shed", "flat", "irimoya"]).default("gable"),
+  pitch: z.number().min(0.25).max(3).default(1),
+  overhang: zInt.min(0).max(8).default(1),
+  ridge: z.enum(["x", "z", "auto"]).default("auto").describe("ridge direction for gable/irimoya (auto = along the longer side)"),
+  shedFacing: zFacing.default("north").describe("high side of a shed roof"),
+  curve: z.number().min(0).max(2).default(0),
+  solid: z.boolean().default(true).describe("fill the whole space under the roof; false = hollow shell (gable ends are still closed)"),
+  merge: z.boolean().default(true).describe("join other createRoof roofs it overlaps: the higher surface wins and valleys are filled (T / L junctions)"),
+  fillMaterial: z.string().optional(),
+  thickness: zInt.min(1).max(4).default(1),
+  ridgeMaterial: z.string().optional(),
+  slopeShape: z.string().optional().describe('force one slope shape (e.g. a custom "ai.tile") instead of automatic wedges'),
+  parapet: z.object({ height: zInt.min(1).default(1), material: z.string() }).optional().describe("flat roofs: low wall around the edge"),
+});
+type RoofArgs = z.output<typeof zRoof>;
+/** two roof surfaces closer than this (cells) are joined; farther apart they stay separate */
+const JOIN_GAP = 3;
+
+/** Roof surface over its overhang rectangle: H = continuous height, Hc = corner heights snapped to 1/ROOF_Q cell. */
+function roofGrid(b: Builder, a: RoofArgs) {
+  const inner = b.rect(a.area);
+  const o = a.overhang;
+  const X0 = inner.x0 - o, X1 = inner.x1 + o, Z0 = inner.z0 - o, Z1 = inner.z1 + o, base = inner.y;
+  const W = X1 - X0 + 1, D = Z1 - Z0 + 1;
+  const ridgeX = a.ridge === "x" || (a.ridge === "auto" && W >= D);
+  const halfShort = (ridgeX ? D : W) / 2;
+  // surface height (in cells) at continuous position (u, v) measured from the min corner
+  const H = (u: number, v: number): number => {
+    const du = Math.min(u, W - u), dv = Math.min(v, D - v);
+    let h: number;
+    switch (a.style) {
+      case "flat": h = 0; break;
+      case "shed": {
+        const [fx, fz] = FACING_VEC[a.shedFacing];
+        h = fx > 0 ? u : fx < 0 ? W - u : fz > 0 ? v : D - v;
+        break;
+      }
+      case "hip": case "pyramid": h = Math.min(du, dv); break;
+      case "irimoya": h = ridgeX ? Math.min(dv, du + halfShort * 0.45) : Math.min(du, dv + halfShort * 0.45); break;
+      default: h = ridgeX ? dv : du;
+    }
+    h *= a.pitch;
+    if (a.curve > 0) {
+      const dm = Math.min(du, dv);
+      h += a.curve * Math.max(0, 1.6 - dm) * 0.6;
+    }
+    return h;
+  };
+  const N = D + 1;
+  const Hc = new Float64Array((W + 1) * N);
+  let peak = 0;
+  for (let i = 0; i <= W; i++)
+    for (let j = 0; j <= D; j++) {
+      const h = Math.round(H(i, j) * ROOF_Q + 1e-9) / ROOF_Q;
+      Hc[i * N + j] = h;
+      if (h > peak) peak = h;
+    }
+  /** absolute surface height at world grid corner (gx, gz), or -Infinity outside */
+  const at = (gx: number, gz: number) => {
+    const i = gx - X0, j = gz - Z0;
+    return i < 0 || j < 0 || i > W || j > D ? -Infinity : base + Hc[i * N + j];
+  };
+  return { inner, X0, X1, Z0, Z1, W, D, N, base, ridgeX, H, Hc, peak, at };
+}
+
 export const createRoof = defineGenerator({
   name: "createRoof",
   type: "roof",
   description:
-    "Roof over an area. style: gable | hip | pyramid | shed | flat | irimoya (hip-and-gable, Japanese) ; pitch = rise per cell (1 = 45deg, 0.5 = gentle). curve>0 turns the eaves up (Asian roofs). Slope pieces are chosen automatically (wedge / half wedges).",
-  schema: z.object({
-    ...zCommon,
-    area: zFootprint,
-    style: z.enum(["gable", "hip", "pyramid", "shed", "flat", "irimoya"]).default("gable"),
-    pitch: z.number().min(0.25).max(3).default(1),
-    overhang: zInt.min(0).max(8).default(1),
-    ridge: z.enum(["x", "z", "auto"]).default("auto").describe("ridge direction for gable/irimoya (auto = along the longer side)"),
-    shedFacing: zFacing.default("north").describe("high side of a shed roof"),
-    curve: z.number().min(0).max(2).default(0),
-    solid: z.boolean().default(true).describe("fill the space under the roof inside the footprint (gable ends)"),
-    fillMaterial: z.string().optional(),
-    thickness: zInt.min(1).max(4).default(1),
-    ridgeMaterial: z.string().optional(),
-    slopeShape: z.string().optional().describe('force one slope shape (e.g. a custom "ai.tile") instead of automatic wedges'),
-    parapet: z.object({ height: zInt.min(1).default(1), material: z.string() }).optional().describe("flat roofs: low wall around the edge"),
-  }),
+    "Roof over an area. style: gable | hip | pyramid | shed | flat | irimoya (hip-and-gable, Japanese) ; pitch = rise per cell (1 = 45deg, 0.5 = gentle, any value works). curve>0 turns the eaves up (Asian roofs). Slope, hip-corner and valley pieces are chosen automatically and always meet without gaps. Overlapping createRoof roofs merge (higher surface wins, valleys filled): for a T junction let the wing roof's area run into the main block up to its ridge.",
+  schema: zRoof,
   example: { key: "roof", building: "house", area: { on: { ref: "walls" } }, style: "gable", pitch: 1, overhang: 1, material: "roof_tile" },
   build(b, a) {
-    const inner = b.rect(a.area);
-    const o = a.overhang;
-    const X0 = inner.x0 - o, X1 = inner.x1 + o, Z0 = inner.z0 - o, Z1 = inner.z1 + o, base = inner.y;
-    const W = X1 - X0 + 1, D = Z1 - Z0 + 1;
-    const ridgeX = a.ridge === "x" || (a.ridge === "auto" && W >= D);
-    const halfShort = (ridgeX ? D : W) / 2;
-    // surface height (in cells) at continuous position (u, v) measured from the min corner
-    const H = (u: number, v: number): number => {
-      const du = Math.min(u, W - u), dv = Math.min(v, D - v);
-      let h: number;
-      switch (a.style) {
-        case "flat": h = 0; break;
-        case "shed": {
-          const [fx, fz] = FACING_VEC[a.shedFacing];
-          h = fx > 0 ? u : fx < 0 ? W - u : fz > 0 ? v : D - v;
-          break;
-        }
-        case "hip": case "pyramid": h = Math.min(du, dv); break;
-        case "irimoya": h = ridgeX ? Math.min(dv, du + halfShort * 0.45) : Math.min(du, dv + halfShort * 0.45); break;
-        default: h = ridgeX ? dv : du;
-      }
-      h *= a.pitch;
-      if (a.curve > 0) {
-        const dm = Math.min(du, dv);
-        h += a.curve * Math.max(0, 1.6 - dm) * 0.6;
-      }
-      return h;
-    };
+    const g = roofGrid(b, a);
+    const { inner, X0, X1, Z0, Z1, N, base, ridgeX, H, Hc, peak } = g;
     const fillMat = a.fillMaterial ?? a.material;
-    const near = (v: number, t: number) => Math.abs(v - t) < 0.2;
+    const inFoot = (x: number, z: number) => x >= inner.x0 && x <= inner.x1 && z >= inner.z0 && z <= inner.z1;
+    const onBorder = (x: number, z: number) => inFoot(x, z) && (x === inner.x0 || x === inner.x1 || z === inner.z0 || z === inner.z1);
+    // fill under the surface: solid -> whole footprint; otherwise only the footprint edge (closes gable ends)
+    const fillUnder = (x: number, z: number, below: number) => {
+      if (!(a.solid ? inFoot(x, z) : onBorder(x, z))) return;
+      for (let k = base; k < below; k++) b.setIfEmpty(x, k, z, fillMat);
+    };
+    if (a.style === "flat") {
+      for (let x = X0; x <= X1; x++)
+        for (let z = Z0; z <= Z1; z++) {
+          const yy = base + Math.floor(H(x - X0 + 0.5, z - Z0 + 0.5) + 1e-6);
+          b.set(x, yy, z, a.material);
+          for (let t = 1; t < a.thickness; t++) b.set(x, yy - t, z, a.material);
+          fillUnder(x, z, yy - (a.thickness - 1));
+          if (a.parapet && (x === X0 || x === X1 || z === Z0 || z === Z1)) {
+            for (let k = 1; k <= a.parapet.height; k++) b.set(x, yy + k, z, a.parapet.material);
+          }
+        }
+      return { ridgeAxis: ridgeX ? "x" : "z", peak: 0 };
+    }
+    // other sloped createRoof roofs that overlap this one (their surfaces are recomputed from their args)
+    const proj = b.ctx.project;
+    const others: ReturnType<typeof roofGrid>[] = [];
+    if (a.merge) {
+      for (const s of proj.meta.structures) {
+        if (s === b.structure || s.source?.cmd !== "createRoof" || !s.visible) continue;
+        try {
+          const oa = zRoof.parse(s.source.args);
+          if (oa.style === "flat" || oa.merge === false) continue;
+          const og = roofGrid(new Builder(b.ctx, s), oa);
+          if (og.X1 < X0 || og.X0 > X1 || og.Z1 < Z0 || og.Z0 > Z1) continue;
+          others.push(og);
+        } catch { /* its references are gone: ignore it */ }
+      }
+    }
+    const otherAt = (gx: number, gz: number) => { let m = -Infinity; for (const og of others) m = Math.max(m, og.at(gx, gz)); return m - base; };
+    const SIDE: Facing[] = ["north", "east", "south", "west"]; // edge between corner k and k+1
+    const APEX: Facing[] = ["west", "north", "east", "south"]; // apex at NW, NE, SE, SW
+    let merged = 0, valley = 0;
     for (let x = X0; x <= X1; x++)
       for (let z = Z0; z <= Z1; z++) {
-        const u = x - X0 + 0.5, v = z - Z0 + 0.5;
-        const hc = H(u, v);
-        // gradient -> uphill facing
-        const gx = H(u + 0.5, v) - H(u - 0.5, v), gz = H(u, v + 0.5) - H(u, v - 0.5);
-        const slope = Math.hypot(gx, gz);
-        const f = facingFromVec(gx, gz);
-        const hu = hc + slope / 2, hd = hc - slope / 2;
-        const y = base + Math.floor(hd + 1e-6);
-        const top = base + Math.floor(hc + 1e-6);
-        const a1 = hu - Math.floor(hd + 1e-6), b1 = hd - Math.floor(hd + 1e-6);
-        let shape = "cube", rot = 0, yy = y;
-        if (a.style === "flat" || slope < 0.05) {
-          yy = top;
-          shape = a.style === "flat" ? "cube" : hc - Math.floor(hc + 1e-6) <= 0.5 ? "slab" : "cube";
-        } else if (a.slopeShape) {
-          shape = a.slopeShape; rot = b.rot(f);
-        } else if (near(a1, 1) && near(b1, 0)) { shape = "wedge"; rot = b.rot(f); }
-        else if (near(a1, 0.5) && near(b1, 0)) { shape = "wedge_half"; rot = b.rot(f); }
-        else if (near(a1, 1) && near(b1, 0.5)) { shape = "wedge_half_hi"; rot = b.rot(f); }
-        else if (a1 > 1.2) { shape = "wedge"; rot = b.rot(f); yy = base + Math.floor(hu - 1 + 1e-6); }
-        else { shape = b1 >= 0.5 ? "cube" : "slab"; }
-        const ridgeCell = slope < 0.05 && a.style !== "flat";
-        b.set(x, yy, z, ridgeCell && a.ridgeMaterial ? a.ridgeMaterial : a.material, shape, rot);
-        // thickness under the surface piece
-        for (let t = 1; t < a.thickness; t++) b.set(x, yy - t, z, a.material);
-        const insideFootprint = x >= inner.x0 && x <= inner.x1 && z >= inner.z0 && z <= inner.z1;
-        if (a.solid && insideFootprint) for (let k = base; k < yy - (a.thickness - 1); k++) b.setIfEmpty(x, k, z, fillMat);
-        else if (!insideFootprint) {
-          // keep overhang continuous: fill down to the neighbour step
-          const below = base + Math.floor(H(u, v) - a.pitch + 1e-6);
-          for (let k = Math.max(base, below + 1); k < yy - (a.thickness - 1); k++) b.setIfEmpty(x, k, z, a.material);
+        const i = x - X0, j = z - Z0;
+        const own = [Hc[i * N + j], Hc[(i + 1) * N + j], Hc[(i + 1) * N + j + 1], Hc[i * N + j + 1]]; // NW NE SE SW
+        let c = own, joined = false, otherHigher = false;
+        if (others.length) {
+          const oc = [otherAt(x, z), otherAt(x + 1, z), otherAt(x + 1, z + 1), otherAt(x, z + 1)];
+          otherHigher = oc.reduce((s, v) => s + v, 0) > own.reduce((s, v) => s + v, 0) + 1e-9;
+          // only surfaces that meet ours count; a roof far above (an eave over this roof) is left alone
+          const near = oc.map((v, k) => v - own[k] >= -1e-9 && v - own[k] <= JOIN_GAP);
+          if (near.every(Boolean)) { merged++; continue; } // another roof lies right on top here
+          if (near.some((ok, k) => ok && oc[k] > own[k] + 1e-9)) { c = own.map((v, k) => (near[k] ? Math.max(v, oc[k]) : v)); joined = true; valley++; }
         }
-        if (a.parapet && a.style === "flat" && (x === X0 || x === X1 || z === Z0 || z === Z1)) {
-          for (let k = 1; k <= a.parapet.height; k++) b.set(x, yy + k, z, a.parapet.material);
+        const lo = Math.min(...c), hi = Math.max(...c);
+        const top = a.ridgeMaterial && hi >= peak - 1e-9 && !joined ? a.ridgeMaterial : a.material;
+        // columns over the filled part reach down to the fill; the rest is a plate of `thickness` cells
+        const fills = a.solid ? inFoot(x, z) : onBorder(x, z);
+        const T = fills ? 0 : a.thickness;
+        // piece type from which corners are high: 1 = outer hip corner, 3 = valley corner, 2 = plain slope
+        let type: RoofPieceType = "s", facing: Facing = "north", pLo = lo, pHi = hi;
+        if (hi > lo) {
+          const mid = (lo + hi) / 2;
+          const high = c.map((h) => h > mid + 1e-9);
+          const n = high.filter(Boolean).length;
+          if (n === 1) { type = "o"; facing = APEX[high.indexOf(true)]; }
+          else if (n === 3) { type = "i"; facing = APEX[(high.indexOf(false) + 2) % 4]; }
+          else {
+            const k = [0, 1, 2, 3].find((k) => high[k] && high[(k + 1) % 4]);
+            if (k === undefined) pLo = hi; // saddle (two opposite high corners): level at the top
+            else facing = SIDE[k];
+          }
+        }
+        // level cells (ridge line, saddle) use the same pieces with lo = hi
+        const y0 = Math.max(0, Math.floor(pLo - T + 1e-9)), y1 = Math.max(y0, Math.ceil(pHi - 1e-9) - 1);
+        const rot = b.rot(facing);
+        for (let y = y0; y <= y1; y++) {
+          const rl = pLo - y, rh = pHi - y;
+          const id = a.slopeShape && type === "s" && rl === 0 && rh === 1 ? a.slopeShape : roofPieceId(type, rl, rh, fills ? undefined : T);
+          if (!id) continue;
+          if (otherHigher) {
+            // the other roof is on top in this column: keep its cells, only fill the empty ones below
+            const cell = proj.world.get(x, base + y, z);
+            if (cell?.structure && cell.structure !== b.structure.num && proj.structureByNum(cell.structure)?.source?.cmd === "createRoof") continue;
+          }
+          b.set(x, base + y, z, y === y1 ? top : a.material, id, rot);
+        }
+        if (fills) {
+          for (let t = 1; t < a.thickness; t++) b.set(x, base + y0 - t, z, a.material);
+          fillUnder(x, z, base + y0 - (a.thickness - 1));
         }
       }
-    return { ridgeAxis: ridgeX ? "x" : "z", peak: Math.round(H(W / 2, D / 2) * 10) / 10 };
+    return { ridgeAxis: ridgeX ? "x" : "z", peak, ...(merged ? { coveredColumns: merged } : {}), ...(valley ? { joinedColumns: valley } : {}) };
   },
 });
 

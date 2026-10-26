@@ -62,10 +62,13 @@ export function resolveSafe(baseDir: string, p: string, sb: Sandbox, mode: "read
 export function writeFileAtomic(file: string, data: string | Uint8Array, keepBackups = 0) {
   const dir = path.dirname(file);
   fs.mkdirSync(dir, { recursive: true });
+  const bytes = typeof data === "string" ? Buffer.from(data, "utf8") : data;
+  // unchanged content: skip the write (no churn for sync clients / version control)
+  try { if (fs.statSync(file).size === bytes.length && fs.readFileSync(file).equals(bytes)) return; } catch { /* absent */ }
   const tmp = path.join(dir, `.${path.basename(file)}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`);
   const fd = fs.openSync(tmp, "w");
   try {
-    fs.writeSync(fd, typeof data === "string" ? Buffer.from(data, "utf8") : data);
+    fs.writeSync(fd, bytes);
     fs.fsyncSync(fd);
   } catch (e) {
     fs.closeSync(fd);
@@ -77,14 +80,29 @@ export function writeFileAtomic(file: string, data: string | Uint8Array, keepBac
     if (keepBackups > 0 && fs.existsSync(file)) {
       for (let i = keepBackups; i > 1; i--) {
         const from = `${file}.bak${i - 1}`, to = `${file}.bak${i}`;
-        if (fs.existsSync(from)) fs.renameSync(from, to);
+        if (fs.existsSync(from)) renameRetry(from, to);
       }
       fs.copyFileSync(file, `${file}.bak1`);
     }
-    fs.renameSync(tmp, file);
+    renameRetry(tmp, file);
   } catch (e) {
     try { fs.unlinkSync(tmp); } catch { /* ignore */ }
     throw e;
+  }
+}
+
+/**
+ * rename that rides out short locks: on Windows a sync client (OneDrive, Dropbox), an antivirus scan
+ * or another reader can hold the target for a moment and rename fails with EPERM / EACCES / EBUSY.
+ */
+function renameRetry(from: string, to: string) {
+  const waitMs = [20, 50, 100, 200, 400, 800, 1200];
+  for (let i = 0; ; i++) {
+    try { return fs.renameSync(from, to); } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (i >= waitMs.length || !(code === "EPERM" || code === "EACCES" || code === "EBUSY")) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, waitMs[i]);
+    }
   }
 }
 

@@ -61,6 +61,14 @@ export const placeShape = defineGenerator({
         items.push({ at: [base[0] + i * st[0], base[1] + j * st[1], base[2] + k * st[2]], facing: a.facing });
     } else if (L.type === "line") {
       const to = Array.isArray(a.at) ? [L.to[0] + b.origin[0], L.to[1] + b.origin[1], L.to[2] + b.origin[2]] : L.to;
+      const uneven = [0, 1, 2].filter((k) => (to[k] - base[k]) % (L.count - 1) !== 0);
+      if (uneven.length) {
+        const k = uneven[0], step = (to[k] - base[k]) / (L.count - 1), fix = base[k] + Math.round(step) * (L.count - 1);
+        b.ctx.warnings.push(
+          `${b.structure.id}: line spacing ${step.toFixed(2)} is not a whole number, so copies are unevenly spaced ` +
+          `(rows built from other "to" values will drift against this one). Use "to" ${"xyz"[k]}=${fix - (Array.isArray(a.at) ? b.origin[k] : 0)} or a grid layout with step ${Math.round(step)}.`,
+        );
+      }
       for (let i = 0; i < L.count; i++) {
         const t = i / (L.count - 1);
         items.push({ at: [Math.round(base[0] + (to[0] - base[0]) * t), Math.round(base[1] + (to[1] - base[1]) * t), Math.round(base[2] + (to[2] - base[2]) * t)], facing: a.facing });

@@ -1,5 +1,6 @@
 import type { ComponentDef, MaterialDef, ShapeDef } from "../types";
 import { BUILTIN_ALIASES, BUILTIN_MATERIALS, BUILTIN_SHAPES } from "./builtin";
+import { roofPieceDef } from "../geometry/roofPiece";
 
 export type AssetKind = "shape" | "material" | "component";
 export type AnyAsset = ShapeDef | MaterialDef | ComponentDef;
@@ -54,7 +55,11 @@ export class AssetRegistry {
 
   findShape(id: string, project?: ShapeDef[]): ShapeDef | undefined {
     const n = this.normalizeId(id);
-    return this.builtinShapes.get(n) ?? project?.find((d) => d.id === n) ?? this.libShapes.get(n);
+    const hit = this.builtinShapes.get(n) ?? project?.find((d) => d.id === n) ?? this.libShapes.get(n);
+    if (hit || !n.startsWith("builtin.roofp_")) return hit;
+    const made = roofPieceDef(n);
+    if (made) this.builtinShapes.set(n, made);
+    return made;
   }
 
   findMaterial(id: string, project?: MaterialDef[]): MaterialDef | undefined {
