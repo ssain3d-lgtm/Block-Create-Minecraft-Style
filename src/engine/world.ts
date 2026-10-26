@@ -139,7 +139,8 @@ export class World {
   hash(): string {
     let h1 = 0x811c9dc5 >>> 0, h2 = 0;
     this.forEach((x, y, z, b) => {
-      let v = (cellKey(x, y, z) % 2147483647) ^ (b.shape * 73856093) ^ (b.material * 19349663) ^ (b.rot * 83492791);
+      // includes the owning structure: two worlds that differ only in ownership hash differently
+      let v = (cellKey(x, y, z) % 2147483647) ^ Math.imul(b.shape, 73856093) ^ Math.imul(b.material, 19349663) ^ Math.imul(b.rot + 1, 83492791) ^ Math.imul(b.structure + 7, 2654435761 | 0);
       v = Math.imul(v ^ (v >>> 16), 0x45d9f3b);
       v = Math.imul(v ^ (v >>> 16), 0x45d9f3b);
       h1 = (h1 + (v >>> 0)) >>> 0;

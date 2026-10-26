@@ -24,19 +24,29 @@ async function remoteBackend(): Promise<Backend | null> {
   } catch {
     return null;
   }
+  // the running server publishes its per-run API token in <repo>/.vox/token-<port>.json
+  const { readServerToken } = await import("./server");
+  const t = readServerToken(PORT);
+  if (!t) {
+    console.error(`[vox-mcp] a server is running at ${BASE} but its token file (.vox/token-${PORT}.json) is missing`);
+    return null;
+  }
+  const headers = { "content-type": "application/json", "x-vox-token": t.token };
   console.error(`[vox-mcp] using the running server at ${BASE}`);
   return {
     async run(reqs) {
-      const r = await fetch(`${BASE}/api/command`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ requests: reqs }) });
-      return (await r.json()).responses;
+      const r = await fetch(`${BASE}/api/command`, { method: "POST", headers, body: JSON.stringify({ requests: reqs }) });
+      const out = await r.json();
+      if (!r.ok) return [{ ok: false, cmd: reqs[0]?.cmd ?? "?", error: out.error ?? { code: `HTTP_${r.status}`, message: "request refused" } }];
+      return out.responses;
     },
-    async guide() { return (await fetch(`${BASE}/api/guide`)).text(); },
+    async guide() { return (await fetch(`${BASE}/api/guide`, { headers })).text(); },
   };
 }
 
 async function embeddedBackend(): Promise<Backend> {
   const { startServer } = await import("./server");
-  const s = await startServer({ port: PORT, log: (...a) => console.error("[vox]", ...a) });
+  const s = await startServer({ port: PORT, projectPath: process.env.VOX_PROJECT, log: (...a) => console.error("[vox]", ...a) });
   console.error(`[vox-mcp] started studio + API at ${s.url} — open it in a browser to watch`);
   const { guideText } = await import("../engine/guide");
   return {
@@ -93,9 +103,8 @@ async function call(name: string, a: Record<string, any>) {
     case "run_batch": return one("runBatch", { commands: a.commands }, false);
     case "execute_plan": {
       const plan = { ...(a.plan ?? {}), dryRun: !!a.dry_run };
-      // dry runs of a newProject plan are checked in a scratch project by executePlan itself
-      const reqs: CommandRequest[] = plan.newProject && !a.dry_run ? [{ cmd: "newProject", args: { name: plan.name ?? plan.plan ?? "plan", cellSize: plan.cellSize ?? 1 } }] : [];
-      reqs.push({ cmd: "executePlan", args: plan });
+      // one atomic command: with newProject the plan is built in a scratch project and swapped in only on success
+      const reqs: CommandRequest[] = [{ cmd: "executePlan", args: plan }];
       const rs = await backend.run(reqs);
       const last = rs[rs.length - 1];
       const steps = last?.ok ? (last.result.steps as { key: string; structureId: string; blocks: number; warnings: string[] }[]).map((s) => `${s.key}=${s.structureId} +${s.blocks}${s.warnings?.length ? ` (${s.warnings.join("; ")})` : ""}`).join("\n") : "";

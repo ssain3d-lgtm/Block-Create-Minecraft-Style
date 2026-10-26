@@ -8,6 +8,9 @@ export interface AssetStore {
   /** persistent shared library (library/ folder in Node, localStorage in the browser) */
   load(): { shapes: ShapeDef[]; materials: MaterialDef[]; components: ComponentDef[] };
   save(kind: AssetKind, def: AnyAsset): void;
+  /** optional: used to roll back a library change */
+  remove?(kind: AssetKind, id: string): void;
+  read?(kind: AssetKind, id: string): AnyAsset | undefined;
 }
 
 /**
@@ -93,6 +96,24 @@ export class AssetRegistry {
     else if (kind === "material") this.libMaterials.set(def.id, def as MaterialDef);
     else this.libComponents.set(def.id, def as ComponentDef);
     this.store?.save(kind, def);
+  }
+
+  libraryGet(kind: AssetKind, id: string): AnyAsset | undefined {
+    const m = kind === "shape" ? this.libShapes : kind === "material" ? this.libMaterials : this.libComponents;
+    const d = m.get(id);
+    return d ? structuredClone(d) : undefined;
+  }
+
+  /** Undo a register(): put back the previous definition, or remove the new one. */
+  restore(kind: AssetKind, id: string, prev: AnyAsset | undefined) {
+    const m = (kind === "shape" ? this.libShapes : kind === "material" ? this.libMaterials : this.libComponents) as Map<string, AnyAsset>;
+    if (prev) {
+      m.set(id, prev);
+      this.store?.save(kind, prev);
+    } else {
+      m.delete(id);
+      this.store?.remove?.(kind, id);
+    }
   }
 
   search(q: { text?: string; tags?: string[]; kind?: AssetKind }, project?: { shapes: ShapeDef[]; materials: MaterialDef[]; components: ComponentDef[] }) {

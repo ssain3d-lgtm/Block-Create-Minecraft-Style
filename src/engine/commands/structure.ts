@@ -270,14 +270,18 @@ export const executePlan = defineCommand({
     }],
   },
   run(ctx, a) {
-    if (a.dryRun && a.newProject) {
-      // a plan meant for a fresh project is checked in an empty scratch project
+    if (a.newProject) {
+      // "new project + plan" is one atomic step: the plan is built in a scratch engine on an empty
+      // project; nothing (project, shared library) changes unless the whole plan succeeds.
       const E = ctx.engine.constructor as typeof import("../engine").Engine;
-      const scratch = new E({ assets: ctx.engine.assets, replaying: true });
-      if (a.cellSize) scratch.project.meta.settings.cellSize = a.cellSize;
+      const scratch = new E({ assets: ctx.engine.assets, host: ctx.host, replaying: a.dryRun, collectLibrary: true });
+      scratch.newProject(a.name ?? a.plan ?? "plan", a.cellSize ? { cellSize: a.cellSize } : undefined);
       const r = scratch.execute({ cmd: "executePlan", args: { ...a, newProject: false, dryRun: false } });
       if (!r.ok) throw new CmdError(r.error.code, r.error.message, r.error.hint, r.error.path);
-      return { ...r.result, dryRun: true, scratch: true };
+      if (a.dryRun) return { ...r.result, dryRun: true, newProject: true };
+      ctx.libraryWrites.push(...scratch.collectedLibrary);
+      ctx.replaceProject = scratch.project;
+      return { ...r.result, newProject: true };
     }
     const p = ctx.project;
     if (a.title || a.description || a.tags || a.name) ctx.run("setProjectInfo", { name: a.name, title: a.title, description: a.description, tags: a.tags });

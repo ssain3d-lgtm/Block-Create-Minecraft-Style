@@ -153,7 +153,7 @@ function createShapeImpl(ctx: CmdCtx, a: z.output<typeof zShapeArgs>) {
   const i = list.findIndex((d) => d.id === id);
   if (i >= 0) list[i] = def; else list.push(def);
   clearGeometryCache(id);
-  if (a.register && !ctx.engine.replaying) ctx.engine.assets.register("shape", structuredClone(def));
+  if (a.register) ctx.libraryWrites.push({ kind: "shape", def: structuredClone(def) });
   return { id, version: def.version, triangles: g.triangles, bounds: g.bounds.map((v) => +v.toFixed(3)), solidFaces: def.solidFaces, registered: a.register };
 }
 
@@ -202,7 +202,7 @@ function createMaterialImpl(ctx: CmdCtx, a: z.output<typeof zMaterialArgs>) {
   const list = ctx.project.meta.assets.materials;
   const i = list.findIndex((d) => d.id === id);
   if (i >= 0) list[i] = def; else list.push(def);
-  if (a.register && !ctx.engine.replaying) ctx.engine.assets.register("material", structuredClone(def));
+  if (a.register) ctx.libraryWrites.push({ kind: "material", def: structuredClone(def) });
   return { id, version: def.version, registered: a.register };
 }
 
@@ -280,7 +280,7 @@ export const createComponent = defineCommand({
     }
     const def: ComponentDef = { id, name: a.name, size, blocks, tags: a.tags };
     upsert(p.meta.assets.components, def);
-    if (a.register && !ctx.engine.replaying) ctx.engine.assets.register("component", structuredClone(def));
+    if (a.register) ctx.libraryWrites.push({ kind: "component", def: structuredClone(def) });
     return { id, version: def.version, size, blocks: blocks.length, registered: a.register };
   },
   summarize: (r) => `component ${r.id}: ${r.blocks} blocks, size ${r.size.join("x")}`,
@@ -351,11 +351,11 @@ export const registerAsset = defineCommand({
   run(ctx, a) {
     const pa = ctx.project.meta.assets;
     const s = pa.shapes.find((d) => d.id === a.id);
-    if (s) { ctx.engine.assets.register("shape", structuredClone(s)); return { id: a.id, kind: "shape" }; }
+    if (s) { ctx.libraryWrites.push({ kind: "shape", def: structuredClone(s) }); return { id: a.id, kind: "shape" }; }
     const m = pa.materials.find((d) => d.id === a.id);
-    if (m) { ctx.engine.assets.register("material", structuredClone(m)); return { id: a.id, kind: "material" }; }
+    if (m) { ctx.libraryWrites.push({ kind: "material", def: structuredClone(m) }); return { id: a.id, kind: "material" }; }
     const c = pa.components.find((d) => d.id === a.id);
-    if (c) { ctx.engine.assets.register("component", structuredClone(c)); return { id: a.id, kind: "component" }; }
+    if (c) { ctx.libraryWrites.push({ kind: "component", def: structuredClone(c) }); return { id: a.id, kind: "component" }; }
     throw new CmdError("UNKNOWN_ASSET", `"${a.id}" is not a project asset`);
   },
 });

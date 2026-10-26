@@ -3,7 +3,7 @@
 > 세션이 끊기면 이 파일부터 읽고 "다음 작업"부터 이어간다. 설계 기준은 `DESIGN.md`.
 
 ## 현재 단계
-6단계 — AI 연결·검수 / 완료 · 지시서의 P0·P1 전부, P2 대부분 완료 (남은 것은 "미완료" 참고)
+안정화(P0·P1) 완료 → 다음: **범용 Procedural Asset Engine(다중 셀 형상)** — 아래 "다음 작업" 1번
 
 ## 완료
 - [x] World/Chunk(16³, 희소 저장, 구조물 인덱스, dirty 청크 표시) — `test/engine.test.ts`
@@ -55,6 +55,15 @@
 - [x] executePlan dryRun: 새 프로젝트용 플랜은 빈 임시 프로젝트에서 검사
 - [x] 모든 명령의 예시가 스키마를 통과하는지 테스트
 
+### 안정화 작업 (2026-10-26, 지시서 "소스코드 정밀 보완 및 안정화")
+- [x] **P0-1 보안**: 루프백만 허용(0.0.0.0 거부), Host 헤더 검사(DNS 리바인딩 차단), Origin·Sec-Fetch-Site 검사로 다른 사이트 요청 거부, CORS 헤더 제거, 실행마다 바뀌는 API 토큰(`x-vox-token`; 브라우저는 같은 출처에서만 `/api/session`, 로컬 도구는 `.vox/token-<port>.json`), JSON 전용 + 경로별 크기 제한(명령 16MB, 프로젝트 96MB, 한 번에 2000개 명령), 파일 경로 샌드박스(정규화, `..`·절대경로·NUL·심볼릭 링크 탈출 차단, 확장자 제한; 서버·MCP는 `projects/`·`out/` 쓰기, `examples/` 읽기) — `test/server.test.ts`
+- [x] **P0-2 트랜잭션**: 공용 라이브러리 쓰기를 명령 성공 후로 미룸(dryRun·실패·재실행 때는 쓰지 않음), 라이브러리 쓰기가 실패하면 프로젝트 변경과 앞선 라이브러리 쓰기까지 되돌림, `newProject`+계획을 하나의 원자적 명령으로(임시 엔진에서 짓고 성공 시 교체), MCP `execute_plan`·CLI·HTTP 모두 단일 명령으로 실행
+- [x] **P0-3 저장**: 임시 파일 → fsync → 교체(원자적), 이전 버전 3개 백업(`.bak1~3`), 파일 체크섬(블록+구조물 소속+메타데이터)으로 손상 감지, 손상 시 최신 정상 백업에서 자동 복구(손상 파일은 `.corrupt-시각`으로 보관), 서버 종료 시 즉시 저장, 저장 실패 시 이전 파일 유지 + 다음 저장에서 재시도
+- [x] **P1-4 동기화**: 상태 해시에 구조물 소속·메타데이터 포함(`stateHash`), 서버 revision 번호로 이벤트 순서 관리(중복 무시, 빈 번호 감지 시 재동기화), 재동기화 직렬화(동시에 하나만, 그동안 온 이벤트는 보관 후 적용), 편집마다 고유 opId(재전송해도 한 번만 적용), 끊긴 동안의 편집은 보관했다가 재접속 시 전송, 되돌리기/다시하기는 서버 공용 기록 기준
+- [x] **P1-5 테스트**: 아래 결과 참고. 지시서 목록의 8개 회귀 테스트 모두 추가
+- [x] 새 테스트가 찾아 고친 결함: 원자적 쓰기 실패 시 임시 파일이 남던 문제, 이전 AI 검사(check:ai)가 내장 MCP 서버로 실제 `projects/current.vox.json`을 덮어쓰던 문제(VOX_PROJECT로 분리), CLI가 `--project` 저장 실패를 성공처럼 끝내던 문제
+- [x] 하위 호환: 체크섬 없는 기존 프로젝트 파일 그대로 열림(테스트 포함). 예제 4종 재생성 후 검수 0 오류·재실행 일치
+
 ## 진행 중
 - (없음)
 
@@ -77,6 +86,16 @@ npm run vox -- run examples/eiffel.plan.json --project projects/eiffel.vox.json 
 npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9,0,9],\"material\":\"stone\"}}" --project projects/test.vox.json --quiet
 ```
 
+## 검증 기록 (2026-10-26, 클라우드 작업 환경 · GPU 없음)
+| 명령 | 결과 |
+|---|---|
+| `npm run typecheck` | 통과 (exit 0) |
+| `npm test` | 6개 파일, **49개 테스트 통과** (보안 6 · 저장 7 · 트랜잭션 4 · 상태 해시 1 포함) |
+| `npm run check:studio` | 7개 항목 ok (SwiftShader 소프트웨어 GL) |
+| `npm run check:ai` | **30개 항목 ok** — 탭 2개 + AI 동시 편집 수렴, 편집 유실·중복 0, 공용 undo, 오프라인 편집 후 재접속, MCP 새 프로젝트+계획 실패 시 무변경, 토큰 없는 요청 거부 |
+| `npm run build` | 통과 |
+| 실행 못 한 것 | 실제 GPU(RTX 5090) 성능, Windows 실행 — `docs/WINDOWS_TEST.md`의 절차로 사용자 PC에서 점검 |
+
 ## 실측 기록
 **CPU (Node, 클라우드 작업 환경: Intel(R) Xeon(R) Processor @ 2.10GHz, 2코어)** — `bench/results/engine-2026-10-25.json`
 
@@ -98,9 +117,28 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 **GPU FPS: 아직 미측정.** 사용자 PC에서 `bench.bat` 실행 → 결과 표의 "결과 JSON 저장"으로 받아 `bench/results/`에 넣는다.
 
 ## 다음 작업 (재개 시 여기부터)
-1. 사용자 PC에서 `bench.bat`으로 GPU FPS 실측 → `bench/results/`에 기록, 병목에 따라 Greedy/Worker 결정
-2. 로컬 LLM(Qwen 등)으로 MCP 실사용 테스트: "에펠탑 만들어 줘" → 실패하는 지점을 guide·오류 hint·도구 설명에 반영
-3. 타임랩스, Schematic 내보내기(P2)
+1. **범용 Procedural Asset Engine** (사용자 추가 요구, 2026-10-26) — 아래 "후속 요구사항" 전체
+2. 사용자 PC에서 `docs/WINDOWS_TEST.md` 점검 + `bench.bat` GPU 실측 → `bench/results/`
+3. P2-6 Vision LLM 검수 루프(OpenAI 호환 / 로컬 Qwen-VL 어댑터, 반복 횟수 제한, 전후 비교, 실패 시 기존 장면 보존)
+4. P2-7 참조 이미지 → BuildingPlan(실루엣·비율·층수·지붕·돌출·재질·반복 요소 추출, 불확실한 부분은 "추정" 표시)
+
+## 후속 요구사항: 범용 Procedural Asset Engine (원문 요약, 기존 기능·데이터 보존 필수)
+목표: AI가 다양한 크기·형태의 건축 부품을 직접 생성하는 범용 엔진.
+1. 1×1×1 외에 2×4×1, 4×4×4 등 **다중 셀 사용자 정의 형상**
+2. AI가 블록·메시·재질을 스스로 설계 → 생성 → 등록 → 재사용
+3. 작은 장식부터 초대형까지 **크기·해상도 유연** (셀 단위 footprint + 형상 내부 해상도)
+4. 다중 셀 형상의 **충돌·회전·배치·저장·복원·렌더링**
+5. 복합 부품 재사용·반복 배치 (component + 다중 셀 형상)
+6. 기존 건축 API·MCP와 완전 연동 (createShape / placeShape / generators의 shape 인자 / MCP create_asset)
+7. 블록 수 증가 시 성능 유지 (청크·인스턴싱: 앵커 셀만 인스턴스, 나머지 셀은 "점유" 표시)
+8. 실제 건축 예제 + 자동 테스트
+
+구현 메모(설계 초안):
+- ShapeDef에 `size: [w,h,d]`(기본 [1,1,1], 최대 16×16×16), 레시피 좌표는 0..size 범위
+- 월드: 앵커 셀에 형상 저장, 나머지 셀은 예약 형상 `builtin.occupied`(+앵커 오프셋)로 점유 → 겹침 검사, 지우기/칠하기는 앵커 기준으로 전체 처리
+- 회전: 4방위 회전 시 footprint w↔d 교환, 앵커는 회전 후 최소 모서리
+- 렌더: 앵커 셀만 인스턴스(스케일은 size), occupied 셀은 메시 없음·면 가림 없음
+- 저장/복원: 기존 청크 배열 그대로(occupied도 일반 형상 번호) → 파일 형식 호환
 
 ## 결정 기록
 - 2026-10-26: npm workspaces 대신 **단일 패키지 + 폴더 분리**(`src/engine`, `src/render`, `src/studio`, `src/cli`, `src/node`, `src/server`). Windows에서 설치·실행이 단순해서. `src/engine`은 three/node 모듈을 import하지 않는다(브라우저·Node 공용).

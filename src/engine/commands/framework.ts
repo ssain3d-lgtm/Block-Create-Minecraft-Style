@@ -74,6 +74,13 @@ export interface CmdCtx {
   engine: import("../engine").Engine;
   /** set by a command (dry runs) to roll everything back after it returns */
   rollbackOnly?: boolean;
+  /**
+   * Shared-library writes requested by this command. They are applied only after the whole
+   * command (batch / plan included) succeeded, and never for dry runs or replays.
+   */
+  libraryWrites: { kind: "shape" | "material" | "component"; def: any }[];
+  /** set by executePlan{newProject}: the project to swap in once the command succeeded */
+  replaceProject?: import("../project").Project;
 }
 
 export interface CommandDef<S extends z.ZodType = z.ZodType> {

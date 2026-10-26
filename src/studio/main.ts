@@ -63,10 +63,16 @@ app.innerHTML = `
 
 const $ = (id: string) => document.getElementById(id)!;
 const viewport = new Viewport($("view"), engine);
-(window as unknown as { studio: unknown }).studio = { engine, viewport, exec, state };
+(window as unknown as { studio: unknown }).studio = { engine, viewport, exec, state, get link() { return link; } };
 
 // ---------------- command helpers ----------------
 function exec(req: CommandRequest, echo = false): CommandResponse {
+  if (link && (req.cmd === "undo" || req.cmd === "redo")) {
+    // linked: history is the server's (shared with AI agents and other tabs)
+    const cmd = req.cmd;
+    link.serverHistory(cmd).then((r) => { if (r) log(r); afterBigChange(); renderSide(); }).catch((e) => toast(`${cmd} 실패: ${(e as Error).message}`));
+    return { ok: true, cmd, result: {}, warnings: [], summary: `${cmd} (서버)` };
+  }
   const r = engine.execute(req);
   if (r.ok) link?.mirror(req);
   if (echo || !r.ok) log(r);
@@ -214,8 +220,8 @@ function renderSide() {
 
   $("places").innerHTML = m.tags.slice(0, 3).map((t) => `<span>${esc(t)}</span>`).join("");
   $("tag").innerHTML = `<i></i>${esc(m.name)}${m.title ? " · " + esc(m.title) : ""} <em>v${p.log.length}</em>`;
-  document.querySelectorAll<HTMLButtonElement>("[data-act=undo]").forEach((b) => (b.disabled = !engine.canUndo));
-  document.querySelectorAll<HTMLButtonElement>("[data-act=redo]").forEach((b) => (b.disabled = !engine.canRedo));
+  document.querySelectorAll<HTMLButtonElement>("[data-act=undo]").forEach((b) => (b.disabled = !link && !engine.canUndo));
+  document.querySelectorAll<HTMLButtonElement>("[data-act=redo]").forEach((b) => (b.disabled = !link && !engine.canRedo));
 }
 let cmdDraft = "";
 

@@ -31,6 +31,8 @@ const HISTORY_CELL_BUDGET = 4_000_000;
 export interface EngineOptions {
   /** replay engines rebuild from a log: they never write to the shared library */
   replaying?: boolean;
+  /** scratch engines: keep library writes in `collectedLibrary` instead of applying them */
+  collectLibrary?: boolean;
   host?: Host;
   library?: AssetStore;
   assets?: AssetRegistry;
@@ -51,9 +53,12 @@ export class Engine {
   /** last edit apply time in ms (shown in the status bar) */
   lastEditMs = 0;
   readonly replaying: boolean;
+  readonly collectLibrary: boolean;
+  collectedLibrary: CmdCtx["libraryWrites"] = [];
 
   constructor(opts: EngineOptions = {}) {
     this.replaying = !!opts.replaying;
+    this.collectLibrary = !!opts.collectLibrary;
     this.assets = opts.assets ?? new AssetRegistry(opts.library);
     this.host = opts.host;
     this.project = new Project(this.assets);
@@ -106,15 +111,28 @@ export class Engine {
       host: this.host,
       warnings,
       engine: this,
+      libraryWrites: [],
       run: (sub, subArgs) => this.runNested(ctx, sub, subArgs),
     };
     try {
       const result = def.run(ctx, parsed.data);
-      if (def.mutates && ctx.rollbackOnly) {
-        tx.rollback();
-        this.project.meta = JSON.parse(metaBefore) as ProjectMeta;
-        this.emit("change", cmd);
+      if (ctx.replaceProject) {
+        // atomic "new project + plan": built in a scratch engine, swapped in only on success
+        this.commitLibrary(ctx.libraryWrites);
+        const next = ctx.replaceProject;
+        this.setProject(next);
+        this.lastEditMs = performance.now() - t0;
+      } else if (ctx.rollbackOnly) {
+        if (def.mutates) {
+          tx.rollback();
+          this.project.meta = JSON.parse(metaBefore) as ProjectMeta;
+          this.emit("change", cmd);
+        }
+      } else if (!def.mutates) {
+        this.commitLibrary(ctx.libraryWrites);
       } else if (def.mutates) {
+        // shared library first: if writing it fails, the project change is rolled back too
+        this.commitLibrary(ctx.libraryWrites);
         this.refreshStructureBoxes(tx);
         if (tx.skippedOutOfBounds) warnings.push(`${tx.skippedOutOfBounds} block(s) outside project bounds were skipped`);
         const metaAfter = JSON.stringify(this.project.meta);
@@ -141,6 +159,28 @@ export class Engine {
         ? { code: e.code, message: e.message, hint: e.hint, path: e.path }
         : { code: "INTERNAL", message: e instanceof Error ? e.message : String(e) };
       return { ok: false, id: req.id, cmd, error: err };
+    }
+  }
+
+  /**
+   * Applies deferred shared-library writes. On a failure every write already applied is
+   * reverted (previous definition restored or the new file removed) and the error is rethrown.
+   */
+  private commitLibrary(writes: CmdCtx["libraryWrites"]) {
+    if (!writes.length || this.replaying) return;
+    if (this.collectLibrary) { this.collectedLibrary.push(...writes); return; }
+    const done: { kind: "shape" | "material" | "component"; id: string; prev: unknown }[] = [];
+    try {
+      for (const w of writes) {
+        const prev = this.assets.libraryGet(w.kind, w.def.id);
+        done.push({ kind: w.kind, id: w.def.id, prev });
+        this.assets.register(w.kind, w.def);
+      }
+    } catch (e) {
+      for (const d of done.reverse()) {
+        try { this.assets.restore(d.kind, d.id, d.prev as never); } catch { /* best effort */ }
+      }
+      throw new CmdError("LIBRARY_WRITE_FAILED", `could not save to the shared library: ${(e as Error).message}`);
     }
   }
 
@@ -228,19 +268,32 @@ export class Engine {
 
   loadFile(file: ProjectFile): { replayed: boolean } {
     if (file?.app !== "ai-voxel-studio") throw new CmdError("BAD_FILE", "not an ai-voxel-studio project file");
-    if (file.world) {
-      const p = new Project(this.assets, file.meta);
-      p.world = World.deserialize(file.world);
-      p.log = file.log ?? [];
-      p.seq = p.log.length ? p.log[p.log.length - 1].seq : 0;
-      this.setProject(p);
-      return { replayed: false };
+    let p: Project;
+    let replayed = false;
+    try {
+      if (file.world) {
+        p = new Project(this.assets, file.meta);
+        p.world = World.deserialize(file.world);
+        p.log = file.log ?? [];
+        p.seq = p.log.length ? p.log[p.log.length - 1].seq : 0;
+      } else {
+        // no block snapshot: rebuild by replaying the command log
+        p = Engine.replay(file.log, this.assets, file.meta.settings, file.meta.assets);
+        p.meta.name = file.meta.name;
+        replayed = true;
+      }
+    } catch (e) {
+      throw new CmdError("CORRUPT", `project file is damaged: ${(e as Error).message}`);
     }
-    // no block snapshot: rebuild by replaying the command log
-    const p = Engine.replay(file.log, this.assets, file.meta.settings, file.meta.assets);
-    p.meta.name = file.meta.name;
+    // integrity: blocks must match the checksum written at save time (log-only files: blocks only)
+    if (file.checksum) {
+      const want = file.checksum.split("|")[0];
+      if (p.world.hash() !== want || (!replayed && p.stateHash() !== file.checksum)) {
+        throw new CmdError("CORRUPT", "project file does not match its checksum (damaged or edited by hand)", "restore a backup (.bak1, .bak2 ...) or re-run its plan");
+      }
+    }
     this.setProject(p);
-    return { replayed: true };
+    return { replayed };
   }
 
   /** Builds a fresh project from a command log (deterministic). */

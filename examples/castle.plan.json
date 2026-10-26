@@ -237,7 +237,7 @@
             "loop": {
               "on": {
                 "ref": "base",
-                "inset": 1
+                "inset": 3
               }
             },
             "height": 5,

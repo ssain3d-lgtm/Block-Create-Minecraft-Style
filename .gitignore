@@ -6,3 +6,5 @@ out/
 shots/
 bench/results/*.tmp
 projects/
+.vox/
+*.tmp

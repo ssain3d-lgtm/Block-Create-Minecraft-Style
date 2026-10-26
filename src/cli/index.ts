@@ -5,6 +5,7 @@
 //   vox run examples/house.plan.json --project out/house.vox.json
 //   vox commands | vox describe fillRegion | vox state --project my.vox.json
 import fs from "node:fs";
+import path from "node:path";
 import { createNodeEngine } from "../node/host";
 import type { CommandRequest, CommandResponse } from "../engine/engine";
 import { toRequests } from "./input";
@@ -34,7 +35,6 @@ options:
 async function render(projectPath: string | undefined, views: string, outDir: string, labels: boolean) {
   if (!projectPath || !fs.existsSync(projectPath)) { console.error("render needs --project <existing file>"); process.exit(1); }
   const os = await import("node:os");
-  const path = await import("node:path");
   const { startServer } = await import("../server/server");
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vox-render-"));
   fs.copyFileSync(projectPath, path.join(tmp, "p.vox.json"));
@@ -73,10 +73,18 @@ function main(argv: string[]) {
     return;
   }
 
-  const engine = createNodeEngine();
+  // The CLI is driven by the person at the keyboard: the folders they name on the command line
+  // (--project, --out) are allowed in addition to the current folder. Paths inside command JSON
+  // stay limited to those folders.
+  const outFlag = args.includes("--out") ? args[args.indexOf("--out") + 1] : undefined;
+  const allowed = [process.cwd(), ...[projectPath, outFlag].filter((p): p is string => !!p).map((p) => path.dirname(path.resolve(p)))];
+  const engine = createNodeEngine({ sandbox: { read: allowed, write: allowed } });
   if (projectPath && fs.existsSync(projectPath)) {
-    const r = engine.execute({ cmd: "loadProject", args: { path: projectPath } });
+    const r = engine.execute({ cmd: "loadProject", args: { path: path.resolve(projectPath) } });
     if (!r.ok) fail(r);
+  } else if (projectPath && ["state", "verify", "inspect", "glb"].includes(sub)) {
+    console.error(`project file not found: ${projectPath}`);
+    process.exit(1);
   }
 
   let requests: CommandRequest[] = [];
@@ -120,8 +128,9 @@ function main(argv: string[]) {
   }
   const changed = engine.project.log.length !== logBefore;
   if (projectPath && changed && !failed) {
-    const r = engine.execute({ cmd: "saveProject", args: { path: projectPath } });
+    const r = engine.execute({ cmd: "saveProject", args: { path: path.resolve(projectPath) } });
     print(r, quiet);
+    if (!r.ok) failed = true;
   }
   process.exit(failed ? 1 : 0);
 }

@@ -9,6 +9,15 @@ export interface ProjectFile {
   meta: ProjectMeta;
   log: LogEntry[];
   world?: SerializedWorld;
+  /** stateHash() at save time; checked on load to detect damaged files */
+  checksum?: string;
+}
+
+/** FNV-1a 32-bit of a string (fast, sync, same in Node and browsers) */
+export function fnv(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(16);
 }
 
 export function defaultMeta(name = "untitled"): ProjectMeta {
@@ -115,6 +124,11 @@ export class Project {
     };
   }
 
+  /** Full state fingerprint: blocks (incl. structure ownership) + project metadata. */
+  stateHash(): string {
+    return `${this.world.hash()}|${fnv(JSON.stringify(this.meta))}`;
+  }
+
   // ---------- io ----------
   toFile(includeWorld = true): ProjectFile {
     return {
@@ -123,6 +137,7 @@ export class Project {
       meta: this.meta,
       log: this.log,
       world: includeWorld ? this.world.serialize() : undefined,
+      checksum: this.stateHash(),
     };
   }
 }
