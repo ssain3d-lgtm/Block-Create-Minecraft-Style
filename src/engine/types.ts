@@ -77,6 +77,13 @@ export type FaceName = "+x" | "-x" | "+y" | "-y" | "+z" | "-z";
 export interface ShapeDef {
   id: string;
   name: string;
+  /**
+   * Cells covered by the shape [w, h, d] (default [1,1,1], max 16 each). Recipe coordinates are
+   * in cell units inside 0..size, so a 2x4x1 arch uses x 0..2, y 0..4, z 0..1.
+   */
+  size?: [number, number, number];
+  /** engine-internal shape (never listed or searchable) */
+  internal?: boolean;
   recipe: Recipe;
   /** faces that completely cover the cell side (used for hidden face culling) */
   solidFaces: FaceName[];

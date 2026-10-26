@@ -45,7 +45,7 @@ export class AssetRegistry {
     return id.includes(".") ? id : `builtin.${id}`;
   }
 
-  builtinShapes_() { return [...this.builtinShapes.values()]; }
+  builtinShapes_() { return [...this.builtinShapes.values()].filter((d) => !d.internal); }
   builtinMaterials_() { return [...this.builtinMaterials.values()]; }
 
   isBuiltin(id: string) {
@@ -68,7 +68,7 @@ export class AssetRegistry {
 
   allShapes(project: ShapeDef[] = []): ShapeDef[] {
     const map = new Map<string, ShapeDef>();
-    for (const d of this.builtinShapes.values()) map.set(d.id, d);
+    for (const d of this.builtinShapes.values()) if (!d.internal) map.set(d.id, d);
     for (const d of this.libShapes.values()) map.set(d.id, d);
     for (const d of project) map.set(d.id, d);
     return [...map.values()];

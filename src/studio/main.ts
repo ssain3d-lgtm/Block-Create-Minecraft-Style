@@ -9,6 +9,7 @@ import { idbGet, idbPut, localStorageLibrary, downloadText, pickFile } from "./s
 import { buildDemo, EXAMPLES } from "./examples";
 import { runBench, showBenchPanel } from "./bench";
 import { connectServer, Link } from "./link";
+import { t, lang, setLang, assetName } from "./i18n";
 import { exportGLB } from "../export/glb";
 
 type Mode = "view" | "add" | "remove" | "paint";
@@ -38,15 +39,16 @@ const app = document.getElementById("app")!;
 app.innerHTML = `
 <header class="header">
   <div class="logo">塔</div>
-  <div class="brand"><b>작은 세계 건축소</b><span>Voxel architecture studio</span></div>
+  <div class="brand"><b id="app-name"></b><span id="app-sub"></span></div>
   <div class="spacer"></div>
   <div class="toolbar">
-    <button data-act="new" title="새 프로젝트">새로</button>
-    <button data-act="open" title="프로젝트 파일 열기">열기</button>
-    <button data-act="save" title="프로젝트 파일 저장 (Ctrl+S)">저장</button>
-    <button data-act="glb" title="3D 모델(.glb) 내보내기">GLB</button>
-    <button data-act="undo" title="되돌리기 (Ctrl+Z)">↶</button>
-    <button data-act="redo" title="다시하기 (Ctrl+Y)">↷</button>
+    <button data-act="new"></button>
+    <button data-act="open"></button>
+    <button data-act="save"></button>
+    <button data-act="glb">GLB</button>
+    <button data-act="undo">↶</button>
+    <button data-act="redo">↷</button>
+    <button data-act="lang" id="lang-btn"></button>
   </div>
   <div class="places" id="places"></div>
 </header>
@@ -54,10 +56,10 @@ app.innerHTML = `
 <main class="view" id="view">
   <div class="tag" id="tag"></div>
   <svg class="compass" viewBox="0 0 40 52"><text x="20" y="9" text-anchor="middle" font-size="8" fill="currentColor">N</text><g id="needle"><line x1="20" y1="44" x2="20" y2="16" stroke="currentColor" stroke-width="1.2"/></g></svg>
-  <div class="helptext" id="helptext">드래그로 회전 · 휠로 확대 · 우클릭으로 이동</div>
+  <div class="helptext" id="helptext"></div>
   <div class="busy" id="busy" hidden></div>
   <div class="toast" id="toast"></div>
-  <button class="shot" id="shot">사진 저장 &nbsp;↗</button>
+  <button class="shot" id="shot"></button>
 </main>
 <footer class="status" id="status"></footer>`;
 
@@ -70,8 +72,8 @@ function exec(req: CommandRequest, echo = false): CommandResponse {
   if (link && (req.cmd === "undo" || req.cmd === "redo")) {
     // linked: history is the server's (shared with AI agents and other tabs)
     const cmd = req.cmd;
-    link.serverHistory(cmd).then((r) => { if (r) log(r); afterBigChange(); renderSide(); }).catch((e) => toast(`${cmd} 실패: ${(e as Error).message}`));
-    return { ok: true, cmd, result: {}, warnings: [], summary: `${cmd} (서버)` };
+    link.serverHistory(cmd).then((r) => { if (r) log(r); afterBigChange(); renderSide(); }).catch((e) => toast(t("historyFailed", { cmd, m: (e as Error).message })));
+    return { ok: true, cmd, result: {}, warnings: [], summary: `${cmd} (${t("serverSide")})` };
   }
   const r = engine.execute(req);
   if (r.ok) link?.mirror(req);
@@ -89,16 +91,16 @@ function log(r: CommandResponse) {
 
 let toastTimer = 0;
 function toast(text: string) {
-  const t = $("toast");
-  t.textContent = text;
-  t.classList.add("show");
+  const box = $("toast");
+  box.textContent = text;
+  box.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => t.classList.remove("show"), 2600);
+  toastTimer = window.setTimeout(() => box.classList.remove("show"), 2600);
 }
 
 // ---------------- sidebar ----------------
 const PRIMARY_SHAPES = [
-  ["builtin.cube", "큐브"], ["builtin.slab", "반블록"], ["builtin.stair", "계단"], ["builtin.wedge", "경사"], ["builtin.floor", "마루"],
+  ["builtin.cube", "shape.cube"], ["builtin.slab", "shape.slab"], ["builtin.stair", "shape.stair"], ["builtin.wedge", "shape.wedge"], ["builtin.floor", "shape.floor"],
 ] as const;
 
 function esc(s: string) {
@@ -112,7 +114,7 @@ function renderSide() {
   const matName = mats.find((x) => x.id === state.material)?.name ?? state.material;
   const shapes = engine.assets.allShapes(m.assets.shapes);
   const extra = shapes.filter((s) => !PRIMARY_SHAPES.some(([id]) => id === s.id));
-  const deg = state.yaw * 90 + (state.upsideDown ? " · 뒤집힘" : "");
+  const deg = state.yaw * 90 + (state.upsideDown ? ` · ${t("flipped")}` : "");
 
   const structs = m.structures;
   const byBuilding = new Map<string, typeof structs>();
@@ -122,7 +124,7 @@ function renderSide() {
     byBuilding.get(k)!.push(s);
   }
   const treeHtml = structs.length === 0
-    ? `<div class="empty">구조물이 없습니다. AI 명령이나 예제로 건물을 지어 보세요.</div>`
+    ? `<div class="empty">${t("noStructs")}</div>`
     : [...byBuilding.entries()].map(([bid, list]) => {
         const b = m.buildings.find((x) => x.id === bid);
         const head = b ? `<div class="node bld"><span class="nm">${esc(b.name)}</span></div>` : "";
@@ -131,85 +133,85 @@ function renderSide() {
           return `<div class="node ${state.selected === s.id ? "sel" : ""}" data-sid="${s.id}">
             <span class="nm">${esc(s.name)}<small>${esc(s.type)} · ${n.toLocaleString()}</small></span>
             <span class="acts">
-              <button data-sact="focus" title="카메라 맞추기">◎</button>
-              <button data-sact="vis" class="${s.visible ? "" : "off"}" title="숨김/표시">${s.visible ? "보임" : "숨김"}</button>
-              <button data-sact="lock" class="${s.locked ? "off" : ""}" title="잠금">${s.locked ? "잠김" : "잠금"}</button>
-              ${s.source && engine.commands.has("rebuildStructure") ? `<button data-sact="rebuild" title="같은 설정으로 다시 짓기">재시공</button>` : ""}
-              <button data-sact="del" title="삭제">✕</button>
+              <button data-sact="focus" title="${t("s.focus")}">◎</button>
+              <button data-sact="vis" class="${s.visible ? "" : "off"}" title="${t("s.vis")}">${s.visible ? t("s.shown") : t("s.hidden")}</button>
+              <button data-sact="lock" class="${s.locked ? "off" : ""}" title="${t("s.lock")}">${s.locked ? t("s.locked") : t("s.lock")}</button>
+              ${s.source && engine.commands.has("rebuildStructure") ? `<button data-sact="rebuild" title="${t("s.rebuild.t")}">${t("s.rebuild")}</button>` : ""}
+              <button data-sact="del" title="${t("s.del")}">✕</button>
             </span></div>`;
         }).join("");
       }).join("");
 
   $("side").innerHTML = `
-    <div class="crumb">${esc(m.name)} / ${m.settings.cellSize}m 격자</div>
+    <div class="crumb">${esc(m.name)} / ${t("grid", { n: m.settings.cellSize })}</div>
     <h1 class="title">${esc(m.title || m.name)}</h1>
-    <p class="desc">${esc(m.description || `${p.world.blockCount.toLocaleString()}블록, ${structs.length}개 구조물`)}</p>
+    <p class="desc">${esc(m.description || t("defaultDesc", { b: p.world.blockCount.toLocaleString(), s: structs.length }))}</p>
 
     <div class="sec">
-      <div class="sec-h"><b>둘러보기</b></div>
+      <div class="sec-h"><b>${t("sec.view")}</b></div>
       <div class="row c2">
-        <button class="btn ${state.view === "all" ? "on" : ""}" data-view="all">전체</button>
-        <button class="btn ${state.view === "main" ? "on" : ""}" data-view="main">탑체</button>
+        <button class="btn ${state.view === "all" ? "on" : ""}" data-view="all">${t("view.all")}</button>
+        <button class="btn ${state.view === "main" ? "on" : ""}" data-view="main">${t("view.main")}</button>
       </div>
       <div class="row c3">
-        <button class="btn ${state.view === "front" ? "on" : ""}" data-view="front">정면</button>
-        <button class="btn ${state.view === "side" ? "on" : ""}" data-view="side">측면</button>
-        <button class="btn ${state.view === "top" ? "on" : ""}" data-view="top">위에서</button>
+        <button class="btn ${state.view === "front" ? "on" : ""}" data-view="front">${t("view.front")}</button>
+        <button class="btn ${state.view === "side" ? "on" : ""}" data-view="side">${t("view.side")}</button>
+        <button class="btn ${state.view === "top" ? "on" : ""}" data-view="top">${t("view.top")}</button>
       </div>
     </div>
 
     <div class="sec">
-      <div class="sec-h"><b>빛과 분위기</b></div>
+      <div class="sec-h"><b>${t("sec.light")}</b></div>
       <div class="row c3">
-        <button class="btn ${state.ambience === "day" ? "on" : ""}" data-amb="day">맑은 낮</button>
-        <button class="btn ${state.ambience === "dusk" ? "on" : ""}" data-amb="dusk">해 질 녘</button>
-        <button class="btn ${state.ambience === "moon" ? "on" : ""}" data-amb="moon">달빛</button>
+        <button class="btn ${state.ambience === "day" ? "on" : ""}" data-amb="day">${t("amb.day")}</button>
+        <button class="btn ${state.ambience === "dusk" ? "on" : ""}" data-amb="dusk">${t("amb.dusk")}</button>
+        <button class="btn ${state.ambience === "moon" ? "on" : ""}" data-amb="moon">${t("amb.moon")}</button>
       </div>
       <div class="checks">
-        <label><input type="checkbox" id="chk-rot" ${state.autoRotate ? "checked" : ""}/>천천히 회전</label>
-        <label><input type="checkbox" id="chk-shadow" ${state.shadows ? "checked" : ""}/>그림자</label>
-        <label><input type="checkbox" id="chk-grid" ${state.grid ? "checked" : ""}/>격자</label>
+        <label><input type="checkbox" id="chk-rot" ${state.autoRotate ? "checked" : ""}/>${t("chk.rot")}</label>
+        <label><input type="checkbox" id="chk-shadow" ${state.shadows ? "checked" : ""}/>${t("chk.shadow")}</label>
+        <label><input type="checkbox" id="chk-grid" ${state.grid ? "checked" : ""}/>${t("chk.grid")}</label>
       </div>
     </div>
 
     <div class="sec">
-      <div class="sec-h"><b>블록 편집</b><span>방향 ${deg}°</span></div>
+      <div class="sec-h"><b>${t("sec.edit")}</b><span>${t("facing")} ${deg}°</span></div>
       <div class="row c4">
-        ${(["view", "add", "remove", "paint"] as Mode[]).map((md) => `<button class="btn ${state.mode === md ? "on" : ""}" data-mode="${md}">${{ view: "감상", add: "추가", remove: "삭제", paint: "칠하기" }[md]}</button>`).join("")}
+        ${(["view", "add", "remove", "paint"] as Mode[]).map((md) => `<button class="btn ${state.mode === md ? "on" : ""}" data-mode="${md}">${t(`mode.${md}`)}</button>`).join("")}
       </div>
       <div class="row c5">
-        ${PRIMARY_SHAPES.map(([id, nm]) => `<button class="btn sm ${state.shape === id ? "on" : ""}" data-shape="${id}">${nm}</button>`).join("")}
+        ${PRIMARY_SHAPES.map(([id, nm]) => `<button class="btn sm ${state.shape === id ? "on" : ""}" data-shape="${id}">${t(nm)}</button>`).join("")}
       </div>
       <select class="more" id="more-shapes">
-        <option value="">다른 형상 (${extra.length}) …</option>
-        ${extra.map((s) => `<option value="${s.id}" ${state.shape === s.id ? "selected" : ""}>${esc(s.name)} — ${esc(s.id)}</option>`).join("")}
+        <option value="">${t("moreShapes", { n: extra.length })}</option>
+        ${extra.map((s) => `<option value="${s.id}" ${state.shape === s.id ? "selected" : ""}>${esc(assetName(s))}${s.size ? ` (${s.size.join("x")})` : ""} — ${esc(s.id)}</option>`).join("")}
       </select>
-      <div class="hint"><span>블록 방향 회전 · 뒤집기 Shift+R</span><kbd>R</kbd></div>
+      <div class="hint"><span>${t("rotateHint")}</span><kbd>R</kbd></div>
     </div>
 
     <div class="sec">
-      <div class="sec-h"><b>재료</b><span>${esc(matName)}</span></div>
+      <div class="sec-h"><b>${t("sec.mat")}</b><span>${esc(matName)}</span></div>
       <div class="swatches">
-        ${mats.map((mt) => `<button class="sw ${mt.id === state.material ? "on" : ""} ${(mt.opacity ?? 1) < 1 ? "glass" : ""}" data-mat="${mt.id}" title="${esc(mt.name)} (${mt.id})" style="background-color:${mt.color}"></button>`).join("")}
+        ${mats.map((mt) => `<button class="sw ${mt.id === state.material ? "on" : ""} ${(mt.opacity ?? 1) < 1 ? "glass" : ""}" data-mat="${mt.id}" title="${esc(assetName(mt))} (${mt.id})" style="background-color:${mt.color}"></button>`).join("")}
       </div>
     </div>
 
     <div class="sec">
-      <div class="sec-h"><b>구조물</b><span>${structs.length}개</span></div>
+      <div class="sec-h"><b>${t("sec.struct")}</b><span>${t("count", { n: structs.length })}</span></div>
       <div class="tree">${treeHtml}</div>
     </div>
 
     <div class="sec">
-      <div class="sec-h"><b>AI 명령</b><span>JSON · 플랜</span></div>
+      <div class="sec-h"><b>${t("sec.ai")}</b><span>${t("ai.kind")}</span></div>
       <select class="more" id="examples">
-        <option value="">예제 불러오기 …</option>
-        ${EXAMPLES.map((e, i) => `<option value="${i}">${esc(e.name)}</option>`).join("")}
+        <option value="">${t("loadExample")}</option>
+        ${EXAMPLES.map((e, i) => `<option value="${i}">${esc(t(e.name))}</option>`).join("")}
       </select>
       <textarea class="cmd" id="cmd" spellcheck="false" placeholder='{"cmd":"fillRegion","args":{"from":[0,0,0],"to":[4,0,4],"material":"stone"}}'></textarea>
       <div class="row c3" style="margin-top:5px">
-        <button class="btn on" id="run">실행</button>
-        <button class="btn" id="inspect" title="떠 있는 블록·누락·빈 구조물 자동 검사">검수</button>
-        <button class="btn" id="cmds">명령 목록</button>
+        <button class="btn on" id="run">${t("run")}</button>
+        <button class="btn" id="inspect" title="${t("inspect.t")}">${t("inspect")}</button>
+        <button class="btn" id="cmds">${t("commands")}</button>
       </div>
       <div class="out" id="out">${state.output.map((o) => `<div class="${o.ok ? "ok" : "err"}">${esc(o.text)}</div>`).join("")}</div>
     </div>`;
@@ -227,10 +229,10 @@ let cmdDraft = "";
 
 // ---------------- sidebar events (delegated) ----------------
 $("side").addEventListener("click", (e) => {
-  const t = e.target as HTMLElement;
-  const btn = t.closest("button") as HTMLButtonElement | null;
+  const el = e.target as HTMLElement;
+  const btn = el.closest("button") as HTMLButtonElement | null;
   if (!btn) {
-    const node = t.closest("[data-sid]") as HTMLElement | null;
+    const node = el.closest("[data-sid]") as HTMLElement | null;
     if (node) { state.selected = node.dataset.sid; renderSide(); }
     return;
   }
@@ -248,7 +250,7 @@ $("side").addEventListener("click", (e) => {
     if (d.sact === "vis") exec({ cmd: "setStructure", args: { id: sid, visible: !s.visible } }, true);
     if (d.sact === "lock") exec({ cmd: "setStructure", args: { id: sid, locked: !s.locked } }, true);
     if (d.sact === "rebuild") exec({ cmd: "rebuildStructure", args: { id: sid } }, true);
-    if (d.sact === "del" && confirm(`${s.name} (${s.id}) 를 삭제할까요? 되돌리기로 복구할 수 있습니다.`)) exec({ cmd: "deleteStructure", args: { id: sid } }, true);
+    if (d.sact === "del" && confirm(t("confirmDel", { name: s.name, id: s.id }))) exec({ cmd: "deleteStructure", args: { id: sid } }, true);
     state.selected = sid;
   } else if (btn.id === "run") runCommandText();
   else if (btn.id === "inspect") {
@@ -284,7 +286,7 @@ function runCommandText() {
   try {
     reqs = toRequests(JSON.parse(text));
   } catch (err) {
-    state.output.unshift({ ok: false, text: `✗ JSON 오류: ${(err as Error).message}` });
+    state.output.unshift({ ok: false, text: `✗ ${t("jsonError", { m: (err as Error).message })}` });
     return;
   }
   for (const r of reqs) {
@@ -297,10 +299,10 @@ function runCommandText() {
 function loadExample(i: number) {
   const ex = EXAMPLES[i];
   if (!ex) return;
-  if (engine.project.world.blockCount > 0 && !confirm(`현재 프로젝트를 닫고 "${ex.name}" 예제를 열까요? (저장하지 않은 작업은 자동 저장본에만 남습니다)`)) return;
+  if (engine.project.world.blockCount > 0 && !confirm(t("confirmExample", { name: t(ex.name) }))) return;
   const t0 = performance.now();
   ex.build(engine, (r) => log(r), (req) => exec(req));
-  state.output.unshift({ ok: true, text: `✓ 예제 "${ex.name}" ${engine.project.world.blockCount.toLocaleString()}블록 (${Math.round(performance.now() - t0)}ms)` });
+  state.output.unshift({ ok: true, text: `✓ ${t("exampleBuilt", { name: t(ex.name), b: engine.project.world.blockCount.toLocaleString(), ms: Math.round(performance.now() - t0) })}` });
   viewport.chunks.reset();
   afterBigChange();
   state.view = "all";
@@ -316,8 +318,12 @@ function afterBigChange() {
 // ---------------- header toolbar ----------------
 document.querySelector(".toolbar")!.addEventListener("click", async (e) => {
   const act = (e.target as HTMLElement).closest("button")?.dataset.act;
-  if (act === "new") {
-    const name = prompt("새 프로젝트 이름", "새 건축");
+  if (act === "lang") {
+    setLang(lang === "ko" ? "en" : "ko");
+    applyStaticText();
+    lastStatus = "";
+  } else if (act === "new") {
+    const name = prompt(t("newName"), t("newNameDefault"));
     if (name === null) return;
     exec({ cmd: "newProject", args: { name } }, true);
     viewport.chunks.reset();
@@ -331,7 +337,7 @@ document.querySelector(".toolbar")!.addEventListener("click", async (e) => {
     a.href = URL.createObjectURL(blob);
     a.download = `${engine.project.meta.name || "scene"}.glb`;
     a.click();
-    toast(`GLB 내보내기 완료 (${triangles.toLocaleString()} 삼각형)`);
+    toast(t("glbDone", { n: triangles.toLocaleString() }));
   }
   else if (act === "open") {
     const f = await pickFile(".json,.vox.json");
@@ -343,9 +349,9 @@ document.querySelector(".toolbar")!.addEventListener("click", async (e) => {
       viewport.chunks.reset();
       afterBigChange();
       viewport.view("all", false);
-      toast(`${f.name} 열기 완료 (${engine.project.world.blockCount.toLocaleString()}블록)`);
+      toast(t("opened", { f: f.name, b: engine.project.world.blockCount.toLocaleString() }));
     } catch (err) {
-      toast(`열기 실패: ${(err as Error).message}`);
+      toast(t("openFailed", { m: (err as Error).message }));
     }
   } else if (act === "undo") exec({ cmd: "undo" }, true);
   else if (act === "redo") exec({ cmd: "redo" }, true);
@@ -355,7 +361,7 @@ document.querySelector(".toolbar")!.addEventListener("click", async (e) => {
 function saveFile() {
   const name = (engine.project.meta.name || "project").replace(/[\\/:*?"<>|]+/g, "_");
   downloadText(`${name}.vox.json`, JSON.stringify(engine.project.toFile(true)));
-  toast("프로젝트 파일을 저장했습니다");
+  toast(t("saved"));
 }
 
 $("shot").addEventListener("click", () => {
@@ -392,34 +398,34 @@ function targetFor(clientX: number, clientY: number): { place?: Vec3; hit?: Vec3
 }
 
 function hoverAt(x: number, y: number) {
-  const t = targetFor(x, y);
+  const tg = targetFor(x, y);
   if (state.mode === "add") {
-    viewport.showHighlight(t.place ?? null, "#2a7a5f");
-    viewport.showGhost(t.place ?? null, state.shape, rot());
+    viewport.showHighlight(tg.place ?? null, "#2a7a5f");
+    viewport.showGhost(tg.place ?? null, state.shape, rot());
   } else {
     viewport.showGhost(null, state.shape, 0);
-    viewport.showHighlight(t.hit ?? null, state.mode === "remove" ? "#a33a2c" : "#1f5e4c");
+    viewport.showHighlight(tg.hit ?? null, state.mode === "remove" ? "#a33a2c" : "#1f5e4c");
   }
 }
 
 function clickAt(x: number, y: number) {
-  const t = targetFor(x, y);
+  const tg = targetFor(x, y);
   if (state.mode === "view") {
-    if (t.hit) {
-      const b = engine.project.blockAt(...t.hit);
+    if (tg.hit) {
+      const b = engine.project.blockAt(...tg.hit);
       state.selected = b?.structure;
-      if (b) toast(`${b.structure ?? "구조물 없음"} · ${b.shape.replace("builtin.", "")} · ${b.material.replace("builtin.", "")}  [${t.hit.join(", ")}]`);
+      if (b) toast(`${b.structure ?? t("noStructure")} · ${b.shape.replace("builtin.", "")} · ${b.material.replace("builtin.", "")}  [${tg.hit.join(", ")}]`);
       renderSide();
     }
     return;
   }
   let r: CommandResponse | undefined;
-  if (state.mode === "add" && t.place) {
-    r = exec({ cmd: "editBlocks", args: { ops: [{ op: "set", at: t.place, shape: state.shape, material: state.material, facing: FACINGS[state.yaw], upsideDown: state.upsideDown }] } });
-  } else if (state.mode === "remove" && t.hit) {
-    r = exec({ cmd: "editBlocks", args: { ops: [{ op: "remove", at: t.hit }] } });
-  } else if (state.mode === "paint" && t.hit) {
-    r = exec({ cmd: "replaceInRegion", args: { from: t.hit, to: t.hit, material: state.material } });
+  if (state.mode === "add" && tg.place) {
+    r = exec({ cmd: "editBlocks", args: { ops: [{ op: "set", at: tg.place, shape: state.shape, material: state.material, facing: FACINGS[state.yaw], upsideDown: state.upsideDown }] } });
+  } else if (state.mode === "remove" && tg.hit) {
+    r = exec({ cmd: "editBlocks", args: { ops: [{ op: "remove", at: tg.hit }] } });
+  } else if (state.mode === "paint" && tg.hit) {
+    r = exec({ cmd: "replaceInRegion", args: { from: tg.hit, to: tg.hit, material: state.material } });
   }
   if (r) { hoverAt(x, y); renderSide(); }
 }
@@ -439,12 +445,35 @@ window.addEventListener("keydown", (e) => {
   if (views[e.key]) { state.view = views[e.key]; viewport.view(state.view); renderSide(); }
 });
 
+/** texts outside the sidebar (header, buttons, help line) */
+function applyStaticText() {
+  document.documentElement.lang = lang;
+  $("app-name").textContent = t("appName");
+  $("app-sub").textContent = t("appSub");
+  const set = (act: string, text: string | null, title: string) => {
+    const b = document.querySelector<HTMLButtonElement>(`[data-act=${act}]`)!;
+    if (text !== null) b.textContent = text;
+    b.title = title;
+  };
+  set("new", t("tb.new"), t("tb.new.t"));
+  set("open", t("tb.open"), t("tb.open.t"));
+  set("save", t("tb.save"), t("tb.save.t"));
+  set("glb", null, t("tb.glb.t"));
+  set("undo", null, t("tb.undo.t"));
+  set("redo", null, t("tb.redo.t"));
+  set("lang", lang === "ko" ? "EN" : "한국어", t("tb.lang.t"));
+  $("shot").innerHTML = `${t("shot")} &nbsp;↗`;
+  document.title = `${t("appName")} — AI Voxel Architecture Studio`;
+  if (linkStatus) linkStatus = t("linked");
+  updateHelp();
+}
+
 function updateHelp() {
   $("helptext").textContent = {
-    view: "드래그로 회전 · 휠로 확대 · 우클릭으로 이동 · 클릭으로 구조물 확인",
-    add: "클릭으로 블록 추가 · R 회전 · Shift+R 뒤집기 · Esc 감상",
-    remove: "클릭으로 블록 삭제 · Esc 감상",
-    paint: "클릭으로 재료 칠하기 · Esc 감상",
+    view: t("help.view"),
+    add: t("help.add"),
+    remove: t("help.remove"),
+    paint: t("help.paint"),
   }[state.mode];
 }
 
@@ -453,11 +482,11 @@ let lastStatus = "";
 let linkStatus = "";
 viewport.frameHooks.push(() => {
   const c = viewport.chunks;
-  const s = `${linkStatus ? `<span class="link">● ${linkStatus}</span> <span class="sep">/</span> ` : ""}${engine.project.world.blockCount.toLocaleString()} 블록 <span class="sep">/</span> ${c.visibleBlocks.toLocaleString()} 표시 <span class="sep">/</span> ${Math.round(viewport.fps)} FPS <span class="sep">/</span> 편집 ${engine.lastEditMs.toFixed(1)}ms <span class="sep">/</span> 메시 ${c.stats().meshes} <span class="right">Minecraft-inspired · WebGL</span>`;
+  const s = `${linkStatus ? `<span class="link">● ${linkStatus}</span> <span class="sep">/</span> ` : ""}${engine.project.world.blockCount.toLocaleString()} ${t("st.blocks")} <span class="sep">/</span> ${c.visibleBlocks.toLocaleString()} ${t("st.visible")} <span class="sep">/</span> ${Math.round(viewport.fps)} FPS <span class="sep">/</span> ${t("st.edit")} ${engine.lastEditMs.toFixed(1)}ms <span class="sep">/</span> ${t("st.meshes")} ${c.stats().meshes} <span class="right">Minecraft-inspired · WebGL</span>`;
   if (s !== lastStatus) { $("status").innerHTML = s; lastStatus = s; }
   $("needle").setAttribute("transform", `rotate(${(-viewport.azimuth() * 180) / Math.PI} 20 30)`);
   const busy = $("busy");
-  if (c.pending > 0) { busy.hidden = false; busy.textContent = `블록 메시 생성 중 · 청크 ${c.pending}개 남음`; } else busy.hidden = true;
+  if (c.pending > 0) { busy.hidden = false; busy.textContent = t("meshing", { n: c.pending }); } else busy.hidden = true;
 });
 
 let saveTimer = 0;
@@ -467,23 +496,24 @@ engine.onChange((e) => {
   clearTimeout(saveTimer);
   if (HEADLESS) return;
   saveTimer = window.setTimeout(() => {
-    idbPut("autosave", JSON.stringify(engine.project.toFile(true))).catch(() => toast("자동 저장 실패 (브라우저 저장소)"));
+    idbPut("autosave", JSON.stringify(engine.project.toFile(true))).catch(() => toast(t("autosaveFailed")));
   }, 1200);
 });
 
 // ---------------- boot ----------------
 async function boot() {
+  applyStaticText();
   let restored = false;
   // 1) a vox server on the same origin? (npm run serve / run.bat) -> live link, server is the source of truth
   if (!params.has("bench")) {
     link = await connectServer(engine, viewport, {
       headless: HEADLESS,
-      onStatus: (s) => { linkStatus = s.startsWith("서버") ? "서버 연결" : s; if (!HEADLESS) toast(s); },
+      onStatus: (s) => { linkStatus = t("linked"); if (!HEADLESS) toast(s); },
       onRemote: (summary) => { if (!HEADLESS) toast(`AI · ${summary}`); afterBigChange(); renderSide(); },
     });
   }
   if (link) {
-    linkStatus = "서버 연결";
+    linkStatus = t("linked");
     restored = true;
     if (engine.project.world.blockCount === 0 && engine.project.meta.structures.length === 0 && !HEADLESS) buildDemo(engine, () => {}, (r) => exec(r));
   } else if (!HEADLESS) {
@@ -501,13 +531,13 @@ async function boot() {
   afterBigChange();
   viewport.view("all", false);
   renderSide();
-  updateHelp();
-  if (restored && !link) toast("마지막 작업을 불러왔습니다");
+  applyStaticText();
+  if (restored && !link) toast(t("restored"));
   const bench = new URLSearchParams(location.search).get("bench");
   if (bench !== null) {
     const ids = bench && bench !== "1" ? bench.split(",") : null;
     const secs = Number(new URLSearchParams(location.search).get("seconds") ?? 10);
-    const data = await runBench(engine, viewport, ids, secs, (msg) => { $("helptext").textContent = "벤치마크 · " + msg; });
+    const data = await runBench(engine, viewport, ids, secs, (msg) => { $("helptext").textContent = `${t("benchPrefix")} · ${msg}`; });
     (window as unknown as { __bench: unknown }).__bench = data;
     showBenchPanel($("view"), data);
     renderSide();

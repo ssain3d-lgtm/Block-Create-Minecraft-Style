@@ -2,6 +2,7 @@ import { z } from "zod";
 import { cellKey, keyToCell, Vec3 } from "../coords";
 import type { BlockData } from "../world";
 import { CmdError, Project } from "../project";
+import { footprintCells, packOffset, shapeSize } from "../multicell";
 import type { Structure } from "../types";
 
 export { CmdError };
@@ -13,22 +14,35 @@ export interface Host {
   exists?(path: string): boolean;
 }
 
-/** Records every cell change of one command so it can be undone / redone / rolled back. */
+/**
+ * Records every cell change of one command so it can be undone / redone / rolled back.
+ *
+ * set() is the LOGICAL write used by commands. It keeps multi-cell shapes whole:
+ *  - writing over (or clearing) any cell of a multi-cell shape removes that whole shape first
+ *  - writing a multi-cell shape at a cell uses it as the anchor (min corner) and fills its
+ *    footprint with "occupied" cells; if part of the footprint is outside the project bounds the
+ *    whole shape is skipped
+ *  - explicit writes of "occupied" cells are ignored (they always come from their anchor)
+ * setRaw() writes exactly one cell (used by rollback-like code paths).
+ */
 export class Tx {
   keys: number[] = [];
   before: (BlockData | null)[] = [];
   private index = new Set<number>();
   touchedStructures = new Set<number>();
   skippedOutOfBounds = 0;
+  /** cells of other blocks removed because a multi-cell shape was written over them */
+  displaced = 0;
 
   constructor(private project: Project) {}
 
-  set(x: number, y: number, z: number, b: BlockData | null) {
+  private inBounds(x: number, y: number, z: number) {
     const { min, max } = this.project.meta.settings.bounds;
-    if (x < min[0] || y < min[1] || z < min[2] || x > max[0] || y > max[1] || z > max[2]) {
-      this.skippedOutOfBounds++;
-      return;
-    }
+    return !(x < min[0] || y < min[1] || z < min[2] || x > max[0] || y > max[1] || z > max[2]);
+  }
+
+  setRaw(x: number, y: number, z: number, b: BlockData | null) {
+    if (!this.inBounds(x, y, z)) { this.skippedOutOfBounds++; return; }
     const prev = this.project.world.set(x, y, z, b);
     const k = cellKey(x, y, z);
     if (!this.index.has(k)) {
@@ -38,6 +52,40 @@ export class Tx {
     }
     if (prev?.structure) this.touchedStructures.add(prev.structure);
     if (b?.structure) this.touchedStructures.add(b.structure);
+  }
+
+  /** removes the whole multi-cell shape that covers (x,y,z), if any. Returns true if one was removed. */
+  clearGroup(x: number, y: number, z: number, known?: BlockData | null): boolean {
+    const p = this.project;
+    const b = known === undefined ? p.world.get(x, y, z) : known;
+    if (!b || (b.shape !== p.occIdxIfAny() && !p.multiDef(b.shape))) return false; // fast path: plain block
+    const g = p.groupAt(x, y, z);
+    if (!g || g.cells.length === 1) return false;
+    for (const c of g.cells) this.setRaw(c[0], c[1], c[2], null);
+    return true;
+  }
+
+  set(x: number, y: number, z: number, b: BlockData | null) {
+    const p = this.project;
+    if (b && b.shape === p.occIdx()) return;
+    const prev = p.world.get(x, y, z);
+    if (prev) this.clearGroup(x, y, z, prev);
+    if (!b) { if (prev) this.setRaw(x, y, z, null); return; }
+    const def = p.multiDef(b.shape);
+    if (!def) { this.setRaw(x, y, z, b.aux ? { ...b, aux: undefined } : b); return; }
+    const cells = footprintCells([x, y, z], shapeSize(def), b.rot);
+    if (!cells.every((c) => this.inBounds(c[0], c[1], c[2]))) { this.skippedOutOfBounds += cells.length; return; }
+    for (const c of cells) {
+      const other = p.world.get(c[0], c[1], c[2]);
+      if (other) { this.displaced++; if (!this.clearGroup(c[0], c[1], c[2], other)) this.setRaw(c[0], c[1], c[2], null); }
+    }
+    const occ = p.occIdx();
+    for (const c of cells) {
+      const anchor = c[0] === x && c[1] === y && c[2] === z;
+      this.setRaw(c[0], c[1], c[2], anchor
+        ? { shape: b.shape, material: b.material, rot: b.rot, structure: b.structure }
+        : { shape: occ, material: b.material, rot: 0, structure: b.structure, aux: packOffset(c[0] - x, c[1] - y, c[2] - z) });
+    }
   }
 
   get size() { return this.keys.length; }

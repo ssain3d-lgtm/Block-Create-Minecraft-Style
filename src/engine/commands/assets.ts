@@ -5,8 +5,10 @@ import { buildGeometry, validateGeometry, clearGeometryCache } from "../geometry
 import type { ComponentDef, FaceName, MaterialDef, Recipe, ShapeDef } from "../types";
 import { CmdError, defineCommand, resolveStructure, zFacing, zStructureRef, zVec3, CmdCtx } from "./framework";
 import { FACINGS } from "../coords";
+import { MAX_SHAPE_DIM, footprintCells, isMulti, rotatedSize, shapeSize } from "../multicell";
 
-const zNum01 = z.number().min(-0.001).max(1.001);
+// recipe coordinates are in cell units: 0..1 for a normal block, up to 0..16 for multi-cell shapes
+const zNum01 = z.number().min(-0.001).max(MAX_SHAPE_DIM + 0.001);
 const zP2 = z.tuple([z.number(), z.number()]);
 const zV3f = z.tuple([z.number(), z.number(), z.number()]);
 
@@ -18,7 +20,7 @@ export const zRecipe: z.ZodType<Recipe> = z.lazy(() =>
       .describe("2D polygon extruded along an axis. axis x: points are (z, y); axis z: points are (x, y). The tall/back side should be at z=0 (north)."),
     z.object({ type: z.literal("lathe"), profile: z.array(zP2).min(2).max(100), segments: z.number().int().min(3).max(48).optional() })
       .describe("profile (radius, y) from bottom to top, revolved around the cell's vertical centre"),
-    z.object({ type: z.literal("curve"), path: z.array(zP2).min(2).max(200), thickness: z.number().positive().max(1), axis: z.enum(["x", "z"]).optional(), from: zNum01.optional(), to: zNum01.optional() })
+    z.object({ type: z.literal("curve"), path: z.array(zP2).min(2).max(200), thickness: z.number().positive().max(MAX_SHAPE_DIM), axis: z.enum(["x", "z"]).optional(), from: zNum01.optional(), to: zNum01.optional() })
       .describe("thick polyline (curved tile, arch rib): path points like extrude profile points"),
     z.object({ type: z.literal("subvoxel"), size: z.number().int().min(2).max(16), mask: z.array(z.array(z.string())) })
       .describe("mask[y][z] is a row string over x; '#' = filled. size^3 grid inside the cell"),
@@ -122,9 +124,11 @@ export const describeAsset = defineCommand({
 });
 
 // ---------------- shapes ----------------
+const zDim = z.number().int().min(1).max(MAX_SHAPE_DIM);
 const zShapeArgs = z.object({
   id: zId.describe('new id, e.g. "ai.jp_roof_tile" (prefix ai. is added when missing)'),
   name: z.string().min(1),
+  size: z.tuple([zDim, zDim, zDim]).optional().describe("cells covered [w,h,d] (default [1,1,1], max 16 each); recipe coordinates are in cells within 0..size"),
   recipe: zRecipe,
   solidFaces: z.array(z.enum(["+x", "-x", "+y", "-y", "+z", "-z"])).optional().describe("faces fully covering the cell side; auto-detected for box/subvoxel"),
   tags: z.array(z.string()).default([]),
@@ -134,17 +138,31 @@ const zShapeArgs = z.object({
 
 function createShapeImpl(ctx: CmdCtx, a: z.output<typeof zShapeArgs>) {
   const id = qualify(a.id);
+  const size = (a.size ?? [1, 1, 1]) as [number, number, number];
+  const multi = size.some((v) => v > 1);
+  const lim = multi ? `0..${size.join(", 0..")} (x, y, z in cells)` : "0..1";
   let g;
   try {
-    g = buildGeometry(a.recipe);
+    g = buildGeometry(a.recipe, size);
   } catch (e) {
-    throw new CmdError("BAD_SHAPE", (e as Error).message, "check the recipe coordinates (0..1) and polygon order");
+    throw new CmdError("BAD_SHAPE", (e as Error).message, `check the recipe coordinates (${lim}) and polygon order`);
   }
-  const issues = validateGeometry(g);
-  if (issues.length) throw new CmdError("BAD_SHAPE", issues.join("; "), "keep every coordinate between 0 and 1");
+  const issues = validateGeometry(g, size);
+  if (issues.length) throw new CmdError("BAD_SHAPE", issues.join("; "), `keep every coordinate within ${lim}${multi ? "" : ", or give a size like [2,4,1] for a bigger shape"}`);
+  // changing the size of a shape that is already placed would break its placements
+  const existing = ctx.project.assets.findShape(id, ctx.project.meta.assets.shapes);
+  const oldSize = (existing?.size ?? [1, 1, 1]).join("x");
+  if (existing && oldSize !== size.join("x")) {
+    const idx = ctx.project.meta.palette.shapes.indexOf(id);
+    let used = false;
+    if (idx > 0) for (const c of ctx.project.world.chunks.values()) if (c.shape.includes(idx)) { used = true; break; }
+    if (used) throw new CmdError("SIZE_IN_USE", `shape ${id} is placed in this project with size ${oldSize}`, `use a new id (e.g. "${id}_${size.join("x")}") for the ${size.join("x")} version`);
+  }
   const def: ShapeDef = {
     id, name: a.name, recipe: a.recipe,
-    solidFaces: a.solidFaces ?? autoSolidFaces(a.recipe),
+    ...(multi ? { size } : {}),
+    // multi-cell shapes never hide neighbour faces (their outer faces are rarely full)
+    solidFaces: multi ? [] : a.solidFaces ?? autoSolidFaces(a.recipe),
     tags: a.tags, description: a.description,
   };
   // versions are per project (deterministic on replay); caches are cleared by id below
@@ -153,8 +171,9 @@ function createShapeImpl(ctx: CmdCtx, a: z.output<typeof zShapeArgs>) {
   const i = list.findIndex((d) => d.id === id);
   if (i >= 0) list[i] = def; else list.push(def);
   clearGeometryCache(id);
+  ctx.project.clearShapeCache();
   if (a.register) ctx.libraryWrites.push({ kind: "shape", def: structuredClone(def) });
-  return { id, version: def.version, triangles: g.triangles, bounds: g.bounds.map((v) => +v.toFixed(3)), solidFaces: def.solidFaces, registered: a.register };
+  return { id, version: def.version, size, triangles: g.triangles, bounds: g.bounds.map((v) => +v.toFixed(3)), solidFaces: def.solidFaces, registered: a.register };
 }
 
 export const createShape = defineCommand({
@@ -169,7 +188,7 @@ export const createShape = defineCommand({
     recipe: { type: "extrude", axis: "x", profile: [[0, 0], [1, 0], [1, 0.25], [0, 0.75]] },
   },
   run: (ctx, a) => createShapeImpl(ctx, a),
-  summarize: (r) => `shape ${r.id} v${r.version}: ${r.triangles} triangles${r.registered ? ", registered" : ""}`,
+  summarize: (r) => `shape ${r.id} v${r.version} (${r.size.join("x")} cells): ${r.triangles} triangles${r.registered ? ", registered" : ""}`,
 });
 
 // ---------------- materials ----------------
@@ -264,7 +283,8 @@ export const createComponent = defineCommand({
         for (let y = min[1]; y <= max[1]; y++)
           for (let z = min[2]; z <= max[2]; z++) {
             const b = p.world.get(x, y, z);
-            if (b) blocks.push({ at: [x - min[0], y - min[1], z - min[2]], shape: p.shapeId(b.shape), material: p.materialId(b.material), rot: b.rot });
+            // covered cells of multi-cell shapes come back from their anchor
+            if (b && b.shape !== p.occIdxIfAny()) blocks.push({ at: [x - min[0], y - min[1], z - min[2]], shape: p.shapeId(b.shape), material: p.materialId(b.material), rot: b.rot });
           }
       if (!blocks.length) throw new CmdError("EMPTY", "no blocks in that region");
     } else {
@@ -276,7 +296,12 @@ export const createComponent = defineCommand({
       });
       const mn = [0, 1, 2].map((i) => Math.min(...blocks.map((b) => b.at[i])));
       blocks = blocks.map((b) => ({ ...b, at: [b.at[0] - mn[0], b.at[1] - mn[1], b.at[2] - mn[2]] as Vec3 }));
-      size = [0, 1, 2].map((i) => Math.max(...blocks.map((b) => b.at[i])) + 1) as Vec3;
+      // the component box includes the whole footprint of multi-cell shapes
+      const far = (b: ComponentDef["blocks"][number]) => {
+        const fp = rotatedSize(shapeSize(p.assets.findShape(b.shape, p.meta.assets.shapes)), b.rot ?? 0);
+        return [b.at[0] + fp[0], b.at[1] + fp[1], b.at[2] + fp[2]];
+      };
+      size = [0, 1, 2].map((i) => Math.max(...blocks.map((b) => far(b)[i]))) as Vec3;
     }
     const def: ComponentDef = { id, name: a.name, size, blocks, tags: a.tags };
     upsert(p.meta.assets.components, def);
@@ -329,7 +354,11 @@ export const placeComponent = defineCommand({
         for (let iz = 0; iz < nz; iz++) {
           const base: Vec3 = [a.at[0] + ix * step[0], a.at[1] + iy * step[1], a.at[2] + iz * step[2]];
           for (const b of comp.blocks) {
-            const l = rotateLocal(b.at, comp.size, k);
+            const bdef = p.assets.findShape(b.shape, p.meta.assets.shapes);
+            // anchor of a rotated multi-cell shape = min corner of its rotated footprint
+            const l = isMulti(bdef)
+              ? footprintCells(b.at, shapeSize(bdef), b.rot ?? 0).map((c) => rotateLocal(c, comp.size, k)).reduce((m, c) => [Math.min(m[0], c[0]), Math.min(m[1], c[1]), Math.min(m[2], c[2])] as Vec3)
+              : rotateLocal(b.at, comp.size, k);
             const x = base[0] + l[0], y = base[1] + l[1], z = base[2] + l[2];
             if (!a.replace && p.world.get(x, y, z)) continue;
             const rot = (((b.rot ?? 0) & 3) + k) % 4 | ((b.rot ?? 0) & 4);

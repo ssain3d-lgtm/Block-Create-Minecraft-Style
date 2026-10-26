@@ -142,7 +142,7 @@ export function meshChunk(world: World, cx: number, cy: number, cz: number, pal:
         const px = lx + 1, py = ly + 1, pz = lz + 1;
         const i = pidx(px, py, pz);
         const s = shape[i];
-        if (!s) continue;
+        if (!s || s === pal.occ) continue; // covered cells of multi-cell shapes are drawn by their anchor
         total++;
         const m = material[i];
         const bucket = pal.matBucket[m] ?? 0; // stale palette (new material) falls back to opaque
@@ -203,9 +203,11 @@ export function meshChunk(world: World, cx: number, cy: number, cz: number, pal:
           }
           if (emitted) visible++;
         } else {
-          // skip instances completely enclosed by opaque full cubes
-          let enclosed = true;
-          for (let f = 0; f < 6 && enclosed; f++) {
+          const sx = pal.shapeSize[s * 3], sy = pal.shapeSize[s * 3 + 1], sz = pal.shapeSize[s * 3 + 2];
+          const multi = sx > 1 || sy > 1 || sz > 1;
+          // skip instances completely enclosed by opaque full cubes (1-cell shapes only)
+          let enclosed = !multi;
+          for (let f = 0; f < 6 && enclosed && !multi; f++) {
             const F = FACES[f];
             const ni = pidx(px + F.dir[0], py + F.dir[1], pz + F.dir[2]);
             if (!isOccluderAO(ni)) enclosed = false;
@@ -216,7 +218,7 @@ export function meshChunk(world: World, cx: number, cy: number, cz: number, pal:
           let g = groups.get(gk);
           if (!g) { g = { shape: s, bucket, m: [], c: [], t: [] }; groups.set(gk, g); }
           const mat = new Float32Array(16);
-          instanceMatrix(wx, wy, wz, rot[i], mat, 0);
+          instanceMatrix(wx, wy, wz, rot[i], mat, 0, multi ? [sx, sy, sz] : undefined);
           for (let k = 0; k < 16; k++) g.m.push(mat[k]);
           g.c.push(r0, g0, b0);
           g.t.push(tu, tv);

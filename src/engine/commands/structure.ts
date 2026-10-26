@@ -5,6 +5,7 @@ import type { Structure } from "../types";
 import { CmdCtx, CmdError, defineCommand, zVec3 } from "./framework";
 import { GENERATORS, runGenerator } from "./builder";
 import { rotateLocal } from "./assets";
+import { footprintCells, shapeSize } from "../multicell";
 
 function refsOf(s: Structure): string[] {
   const out: string[] = [];
@@ -157,18 +158,29 @@ function copyFrom(ctx: CmdCtx, a: DupArgs, dst: Structure): number {
   const size: Vec3 = [box.max[0] - box.min[0] + 1, box.max[1] - box.min[1] + 1, box.max[2] - box.min[2] + 1];
   const i = a.index ?? 1;
   let n = 0;
-  for (const k of p.world.structureCells(src.num)) {
-    const c = keyToCell(k);
-    const b = p.world.get(c[0], c[1], c[2])!;
+  const occ = p.occIdxIfAny();
+  const moveCell = (c: Vec3): Vec3 => {
     let l: Vec3 = [c[0] - box.min[0], c[1] - box.min[1], c[2] - box.min[2]];
-    let yaw = b.rot & 3;
-    if (a.mirror === "x") { l = [size[0] - 1 - l[0], l[1], l[2]]; if (yaw === 1 || yaw === 3) yaw = 4 - yaw; }
-    if (a.mirror === "z") { l = [l[0], l[1], size[2] - 1 - l[2]]; if (yaw === 0 || yaw === 2) yaw = 2 - yaw; }
+    if (a.mirror === "x") l = [size[0] - 1 - l[0], l[1], l[2]];
+    if (a.mirror === "z") l = [l[0], l[1], size[2] - 1 - l[2]];
     l = rotateLocal(l, size, a.rotate);
+    return [box.min[0] + l[0] + a.offset[0] * i, box.min[1] + l[1] + a.offset[1] * i, box.min[2] + l[2] + a.offset[2] * i];
+  };
+  // read everything first (the copy may overlap the source)
+  const src2 = p.world.structureCells(src.num).map((k) => { const c = keyToCell(k); return { c, b: p.world.get(c[0], c[1], c[2])! }; });
+  for (const { c, b } of src2) {
+    if (b.shape === occ) continue; // covered cells are recreated from their anchor
+    let yaw = b.rot & 3;
+    if (a.mirror === "x" && (yaw === 1 || yaw === 3)) yaw = 4 - yaw;
+    if (a.mirror === "z" && (yaw === 0 || yaw === 2)) yaw = 2 - yaw;
     yaw = (yaw + a.rotate) % 4;
-    const x = box.min[0] + l[0] + a.offset[0] * i, y = box.min[1] + l[1] + a.offset[1] * i, z = box.min[2] + l[2] + a.offset[2] * i;
-    ctx.tx.set(x, y, z, { ...b, rot: yaw | (b.rot & 4), structure: dst.num });
-    n++;
+    const multi = p.multiDef(b.shape);
+    // a multi-cell shape's new anchor is the min corner of its transformed footprint
+    const t = multi
+      ? footprintCells(c, shapeSize(multi), b.rot).map(moveCell).reduce((m, v) => [Math.min(m[0], v[0]), Math.min(m[1], v[1]), Math.min(m[2], v[2])] as Vec3)
+      : moveCell(c);
+    ctx.tx.set(t[0], t[1], t[2], { ...b, rot: yaw | (b.rot & 4), structure: dst.num });
+    n += multi ? shapeSize(multi).reduce((x, y) => x * y, 1) : 1;
   }
   return n;
 }
@@ -216,11 +228,10 @@ export const moveBuilding = defineCommand({
     const moved: { x: number; y: number; z: number; b: ReturnType<typeof p.world.get> }[] = [];
     for (const s of list) {
       if (s.source && GENERATORS.has(s.source.cmd)) continue;
-      for (const k of p.world.structureCells(s.num)) {
-        const [x, y, z] = keyToCell(k);
-        moved.push({ x: x + d[0], y: y + d[1], z: z + d[2], b: p.world.get(x, y, z) });
-        ctx.tx.set(x, y, z, null);
-      }
+      const cells = p.world.structureCells(s.num).map((k) => keyToCell(k));
+      // read first, then clear (clearing one cell of a multi-cell shape clears the whole shape)
+      for (const [x, y, z] of cells) moved.push({ x: x + d[0], y: y + d[1], z: z + d[2], b: p.world.get(x, y, z) });
+      for (const [x, y, z] of cells) ctx.tx.set(x, y, z, null);
       s.overrides = s.overrides.map((o) => ({ ...o, at: [o.at[0] + d[0], o.at[1] + d[1], o.at[2] + d[2]] as Vec3 }));
     }
     for (const m of moved) ctx.tx.set(m.x, m.y, m.z, m.b);

@@ -37,6 +37,8 @@ export interface ServerOptions {
   log?: (...a: unknown[]) => void;
   headlessRender?: boolean; // open a headless browser when no studio tab is connected (default true)
   tokenFile?: string | false; // where to publish the API token (default <repo>/.vox/token-<port>.json)
+  /** shared asset library folder (default <repo>/library) */
+  libraryDir?: string;
   /** only for tests / special setups: write failures are injected here */
   writer?: (file: string, data: string) => void;
 }
@@ -86,7 +88,7 @@ export async function startServer(opts: ServerOptions = {}) {
   const host = opts.host ?? "127.0.0.1";
   if (!LOOPBACK.has(host)) throw new Error(`refusing to listen on ${host}: the vox server only binds to loopback (127.0.0.1 / ::1)`);
   const projectPath = path.resolve(opts.projectPath ?? path.join(root, "projects", "current.vox.json"));
-  const engine = createNodeEngine({ baseDir: root, sandbox: serverSandbox(root) });
+  const engine = createNodeEngine({ baseDir: root, sandbox: serverSandbox(root), libraryDir: opts.libraryDir ?? process.env.VOX_LIBRARY });
   const loaded = loadWithRecovery(projectPath, (f) => engine.loadFile(f), log);
   if (loaded.from) log(`loaded ${path.relative(root, loaded.from)} (${engine.project.world.blockCount} blocks)`);
 

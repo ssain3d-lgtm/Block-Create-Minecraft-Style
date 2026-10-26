@@ -119,6 +119,8 @@ function main(argv: string[]) {
       usage();
   }
 
+  // save when anything changed (a log-length check misses "new project + plan" of equal length)
+  const stateBefore = engine.project.stateHash();
   const logBefore = engine.project.log.length;
   let failed = false;
   for (const req of requests) {
@@ -126,7 +128,7 @@ function main(argv: string[]) {
     print(r, quiet);
     if (!r.ok) { failed = true; break; }
   }
-  const changed = engine.project.log.length !== logBefore;
+  const changed = engine.project.stateHash() !== stateBefore || engine.project.log.length !== logBefore;
   if (projectPath && changed && !failed) {
     const r = engine.execute({ cmd: "saveProject", args: { path: path.resolve(projectPath) } });
     print(r, quiet);

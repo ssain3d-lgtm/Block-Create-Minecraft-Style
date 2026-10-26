@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { keyToCell, makeRot, normBox } from "../coords";
+import { rotatedSize, shapeSize } from "../multicell";
 import { CmdError, defineCommand, resolveStructure, zFacing, zStructureRef, zVec3, boxSize } from "./framework";
 import type { ProjectFile } from "../project";
 
@@ -178,13 +179,16 @@ export const fillRegion = defineCommand({
     const s = resolveStructure(ctx, a.structure, a.structure && typeof a.structure === "object" ? { cmd: "fillRegion", args: { ...a, structure: undefined } } : undefined);
     if (s?.locked) throw new CmdError("LOCKED", `structure ${s.id} is locked`);
     const shape = p.shapeIdx(a.shape), material = p.materialIdx(a.material), rot = rotFrom(a);
+    // multi-cell shapes are tiled: one copy per footprint, only copies that fit inside the box
+    const multi = p.multiDef(shape);
+    const st = multi ? rotatedSize(shapeSize(multi), rot) : [1, 1, 1];
     let n = 0;
-    for (let x = min[0]; x <= max[0]; x++)
-      for (let y = min[1]; y <= max[1]; y++)
-        for (let z = min[2]; z <= max[2]; z++) {
-          if (a.hollow && x > min[0] && x < max[0] && y > min[1] && y < max[1] && z > min[2] && z < max[2]) continue;
+    for (let x = min[0]; x + st[0] - 1 <= max[0]; x += st[0])
+      for (let y = min[1]; y + st[1] - 1 <= max[1]; y += st[1])
+        for (let z = min[2]; z + st[2] - 1 <= max[2]; z += st[2]) {
+          if (a.hollow && x > min[0] && x + st[0] - 1 < max[0] && y > min[1] && y + st[1] - 1 < max[1] && z > min[2] && z + st[2] - 1 < max[2]) continue;
           ctx.tx.set(x, y, z, { shape, material, rot, structure: s?.num ?? 0 });
-          n++;
+          n += st[0] * st[1] * st[2];
         }
     return { blocksAdded: n, structureId: s?.id };
   },
@@ -241,6 +245,17 @@ export const replaceInRegion = defineCommand({
         for (let z = min[2]; z <= max[2]; z++) {
           const b = p.world.get(x, y, z);
           if (!b || (match && b.material !== match) || (only && b.structure !== only.num)) continue;
+          if (b.shape === p.occIdxIfAny() || p.multiDef(b.shape)) {
+            // repaint the whole multi-cell shape (anchor + covered cells) once, from its anchor
+            const g = p.groupAt(x, y, z)!;
+            if (g.block.material === mat) continue;
+            for (const c of g.cells) {
+              const cb = p.world.get(c[0], c[1], c[2]);
+              if (cb) ctx.tx.setRaw(c[0], c[1], c[2], { ...cb, material: mat });
+            }
+            n++;
+            continue;
+          }
           ctx.tx.set(x, y, z, { ...b, material: mat });
           n++;
         }

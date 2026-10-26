@@ -3,7 +3,7 @@
 > 세션이 끊기면 이 파일부터 읽고 "다음 작업"부터 이어간다. 설계 기준은 `DESIGN.md`.
 
 ## 현재 단계
-안정화(P0·P1) 완료 → 다음: **범용 Procedural Asset Engine(다중 셀 형상)** — 아래 "다음 작업" 1번
+안정화(P0·P1) 완료 · 범용 Procedural Asset Engine(다중 셀 형상) 완료 · 한/영 UI·README 완료 → 다음: "다음 작업" 1번
 
 ## 완료
 - [x] World/Chunk(16³, 희소 저장, 구조물 인덱스, dirty 청크 표시) — `test/engine.test.ts`
@@ -64,6 +64,22 @@
 - [x] 새 테스트가 찾아 고친 결함: 원자적 쓰기 실패 시 임시 파일이 남던 문제, 이전 AI 검사(check:ai)가 내장 MCP 서버로 실제 `projects/current.vox.json`을 덮어쓰던 문제(VOX_PROJECT로 분리), CLI가 `--project` 저장 실패를 성공처럼 끝내던 문제
 - [x] 하위 호환: 체크섬 없는 기존 프로젝트 파일 그대로 열림(테스트 포함). 예제 4종 재생성 후 검수 0 오류·재실행 일치
 
+### 범용 Procedural Asset Engine — 다중 셀 형상 (2026-10-26, 사용자 추가 요구 1~8)
+- [x] 1. 다중 셀 형상: `createShape`에 `size:[w,h,d]`(각 1~16), 레시피 좌표는 칸 단위(0..size). 2×4×1 아치, 1×4×1 기둥, 4×4×4 돔, 3×1×3 분수대, 2×1×1 벤치 예제
+- [x] 2. AI가 설계·생성·등록·재사용: 기존 createShape / createMaterial / createComponent + 라이브러리 흐름 그대로, 크기 바꾸려는데 이미 배치돼 있으면 거부(`SIZE_IN_USE`, 새 id 제안)
+- [x] 3. 크기·해상도: 1칸 장식부터 16칸 부품까지 한 형상, 서브복셀 격자는 형상 전체에 걸침(비정육면 격자 허용), 큰 건물은 부품·컴포넌트·배치로 조합. 텍스처는 칸마다 반복(셰이더에서 칸 단위 wrap)
+- [x] 4. 충돌·회전·배치·저장·복원·렌더링: 앵커 칸(회전된 footprint의 최소 모서리) + 나머지 칸은 내부 형상 `builtin.occupied`(aux에 앵커까지 오프셋). 회전 시 가로·깊이 교환, 겹침 정책 replace/skip/error, 어느 칸을 지우거나 칠해도 부품 전체 처리, 다른 부품과 겹치면 그 부품 전체 제거(고아 칸 없음), 범위 밖이면 통째로 건너뜀. 파일 형식 v2(aux 배열, v1 파일도 그대로 읽힘)
+- [x] 5. 복합 부품 재사용·반복: `placeShape` 배치 방식 single / grid / line / ring(바깥·안쪽·고정 방향), 컴포넌트 캡처·회전·반복이 다중 셀 형상을 통째로 유지, 구조물 복제(회전·대칭) 시 앵커 재계산
+- [x] 6. 기존 API·MCP 연동: `placeShape`는 재시공 가능한 생성기(키·참조·건물 기준 좌표·modifyStructure), `getShapeInfo`(크기·방향별 footprint·충돌 미리 확인), fillRegion은 footprint 단위로 타일링, 칸 단위 생성기는 다중 셀 형상을 받으면 placeShape를 안내, AI 가이드·MCP create_asset 설명 갱신
+- [x] 7. 성능: 부품당 인스턴스 1개(영역 묶음 InstancedMesh), occupied 칸은 메시 없음. 실측(CPU): 2×1×2 부품 20,020개 배치 271ms + 메시 228ms. 기존 장면 짓기 시간 약 15~25% 증가(10만 블록 156→174ms)
+- [x] 8. 예제·테스트: 예제 E "다중 셀 부품 정자"(`examples/pavilion.plan.json`, 검수 0 오류, 재실행 일치), `test/multicell.test.ts` 15개, check:ai에 MCP로 4×4×4 부품 생성 + 링 배치 검사
+- [x] 이 작업 중 찾은 결함: CLI가 같은 길이의 새 프로젝트 플랜을 기존 파일에 다시 실행하면 저장하지 않던 문제(상태 해시로 판단하도록 수정, `test/cli.test.ts`), check:ai가 저장소의 공용 `library/`에 테스트 자산을 쓰던 문제(임시 폴더로 분리)
+
+### 한국어 / 영어
+- [x] 스튜디오 UI 한/영 전환: 오른쪽 위 EN / 한국어 버튼, 선택 기억(localStorage), `?lang=en`, 브라우저 언어로 기본값. 내장 재질·형상 이름 영어 표시, 첫 실행 데모·견본 예제 내용도 언어 따라 생성. check:studio에서 전환·유지 검사
+- [x] README: `README.md`(영어) ↔ `README.ko.md`(한국어) 상단 링크로 전환, Windows 점검 문서도 `docs/WINDOWS_TEST.en.md` ↔ `docs/WINDOWS_TEST.md`
+- 예제 플랜(A~E)의 구조물 이름·설명은 프로젝트 데이터라 한국어 그대로 둠(엔진 메시지·AI 가이드는 원래 영어)
+
 ## 진행 중
 - (없음)
 
@@ -90,9 +106,9 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 | 명령 | 결과 |
 |---|---|
 | `npm run typecheck` | 통과 (exit 0) |
-| `npm test` | 6개 파일, **49개 테스트 통과** (보안 6 · 저장 7 · 트랜잭션 4 · 상태 해시 1 포함) |
-| `npm run check:studio` | 7개 항목 ok (SwiftShader 소프트웨어 GL) |
-| `npm run check:ai` | **30개 항목 ok** — 탭 2개 + AI 동시 편집 수렴, 편집 유실·중복 0, 공용 undo, 오프라인 편집 후 재접속, MCP 새 프로젝트+계획 실패 시 무변경, 토큰 없는 요청 거부 |
+| `npm test` | 8개 파일, **66개 테스트 통과** (보안 6 · 저장 8 · 트랜잭션 4 · 상태 해시 1 · 다중 셀 15 · CLI 1 포함) |
+| `npm run check:studio` | 10개 항목 ok (SwiftShader 소프트웨어 GL, 언어 전환 포함) |
+| `npm run check:ai` | **모든 항목 ok** — 탭 2개 + AI 동시 편집 수렴, 편집 유실·중복 0, 공용 undo, 오프라인 편집 후 재접속, MCP 새 프로젝트+계획 실패 시 무변경, MCP 다중 셀 부품 생성·링 배치, 토큰 없는 요청 거부 |
 | `npm run build` | 통과 |
 | 실행 못 한 것 | 실제 GPU(RTX 5090) 성능, Windows 실행 — `docs/WINDOWS_TEST.md`의 절차로 사용자 PC에서 점검 |
 
@@ -117,12 +133,13 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 **GPU FPS: 아직 미측정.** 사용자 PC에서 `bench.bat` 실행 → 결과 표의 "결과 JSON 저장"으로 받아 `bench/results/`에 넣는다.
 
 ## 다음 작업 (재개 시 여기부터)
-1. **범용 Procedural Asset Engine** (사용자 추가 요구, 2026-10-26) — 아래 "후속 요구사항" 전체
-2. 사용자 PC에서 `docs/WINDOWS_TEST.md` 점검 + `bench.bat` GPU 실측 → `bench/results/`
-3. P2-6 Vision LLM 검수 루프(OpenAI 호환 / 로컬 Qwen-VL 어댑터, 반복 횟수 제한, 전후 비교, 실패 시 기존 장면 보존)
-4. P2-7 참조 이미지 → BuildingPlan(실루엣·비율·층수·지붕·돌출·재질·반복 요소 추출, 불확실한 부분은 "추정" 표시)
+1. 사용자 PC에서 `docs/WINDOWS_TEST.md` 점검 + `bench.bat` GPU 실측 → `bench/results/`
+2. P2-6 Vision LLM 검수 루프(OpenAI 호환 / 로컬 Qwen-VL 어댑터, 반복 횟수·작업량 제한, 전후 비교, 품질 보고서, 실패 시 기존 장면 보존) — render_views + modify_structure 재사용
+3. P2-7 참조 이미지 → BuildingPlan(실루엣·비율·층수·지붕·돌출·재질·반복 요소 추출, 불확실한 부분 "추정" 표시)
+4. P2-8 남은 것: 자산 미리보기 이미지(renderScene isolate 활용), 자산 의존성(컴포넌트가 쓰는 형상·재질 버전 고정), 복합 지붕 생성기
+5. 다중 셀 형상 개선 후보: 회전된 직사각 footprint의 composite yaw 정확도, 다중 셀 형상끼리의 면 가림(현재는 가리지 않음), 아주 큰 부품의 그림자·LOD
 
-## 후속 요구사항: 범용 Procedural Asset Engine (원문 요약, 기존 기능·데이터 보존 필수)
+## 후속 요구사항 원문 요약: 범용 Procedural Asset Engine (2026-10-26 완료, 위 "완료" 참고)
 목표: AI가 다양한 크기·형태의 건축 부품을 직접 생성하는 범용 엔진.
 1. 1×1×1 외에 2×4×1, 4×4×4 등 **다중 셀 사용자 정의 형상**
 2. AI가 블록·메시·재질을 스스로 설계 → 생성 → 등록 → 재사용
@@ -147,6 +164,9 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 - 2026-10-26: Web Worker 메시 생성 보류 — 에펠탑 전체 메시가 CPU에서 약 0.3초(청크당 0.7ms), 프레임당 10ms 예산으로 나눠 처리하면 화면이 멈추지 않는다.
 - 2026-10-26: Greedy Meshing은 보류. 블록마다 색 흔들림·텍스처 변형이 있어 합칠 수 있는 면이 적고, 숨은 면 제거만으로 면 수가 크게 줄어든다. 5단계 실측 후 필요하면 같은 색 면만 합치는 방식으로 추가.
 - 2026-10-26: 브라우저 검사는 시스템 Chromium + SwiftShader(소프트웨어 GL)로 돈다. 이 환경의 FPS는 GPU 성능이 아니므로 성능 수치로 쓰지 않는다.
+- 2026-10-26: 다중 셀 형상은 "앵커 + occupied 칸" 방식. 칸 단위 저장·되돌리기·충돌·피킹이 그대로 동작하고 파일 형식도 호환되기 때문(별도 객체 목록 방식은 저장·동기화·undo를 모두 새로 만들어야 함).
+- 2026-10-26: 다중 셀 형상은 이웃 면을 가리지 않음(solidFaces 비움) — 바깥 면이 꽉 찬 경우가 드물고, 잘못 가리면 구멍이 보이기 때문.
+- 2026-10-26: README 기본은 영어(`README.md`), 한국어는 `README.ko.md` — GitHub 첫 화면과 해외 배포(Patreon) 기준.
 - 2026-10-26: 스튜디오와 서버 연동은 "로컬 우선 + 미러링 + 해시 검증" 방식. 명령이 결정적이라 같은 명령을 양쪽에서 실행하면 같은 결과가 나오고, 어긋나면 서버 기준으로 다시 불러온다.
 - 2026-10-26: renderScene은 엔진이 아니라 서버가 처리(화면이 필요해서). 엔진 단독 호출 시 NO_VIEWER 오류와 방법(hint)을 돌려준다.
 - 2026-10-26: 자산 버전은 프로젝트 기준으로 매긴다(재실행 시 결정적). 재실행 엔진은 라이브러리에 쓰지 않는다.

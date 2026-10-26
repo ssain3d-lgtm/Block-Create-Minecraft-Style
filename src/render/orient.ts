@@ -46,11 +46,17 @@ export function solidMask(localSolid: readonly string[], rot: number): number {
   return mask;
 }
 
-/** column-major 4x4 instance matrix for a block at cell (x,y,z) */
-export function instanceMatrix(x: number, y: number, z: number, rot: number, out: Float32Array, o: number) {
+/**
+ * Column-major 4x4 instance matrix for a shape anchored at cell (x,y,z).
+ * The shape's local box [0,w]x[0,h]x[0,d] is rotated about its centre and placed so that the
+ * rotated footprint's min corner is the anchor (for 1x1x1 this is the plain cell transform).
+ */
+export function instanceMatrix(x: number, y: number, z: number, rot: number, out: Float32Array, o: number, size: [number, number, number] = [1, 1, 1]) {
   const m = rotMatrix(rot);
-  const c = applyM3(m, 0.5, 0.5, 0.5);
-  const tx = x + 0.5 - c[0], ty = y + 0.5 - c[1], tz = z + 0.5 - c[2];
+  const [w, h, d] = size;
+  const c = applyM3(m, w / 2, h / 2, d / 2);
+  const W = rot & 1 ? d : w, D = rot & 1 ? w : d;
+  const tx = x + W / 2 - c[0], ty = y + h / 2 - c[1], tz = z + D / 2 - c[2];
   out[o] = m[0]; out[o + 1] = m[3]; out[o + 2] = m[6]; out[o + 3] = 0;
   out[o + 4] = m[1]; out[o + 5] = m[4]; out[o + 6] = m[7]; out[o + 7] = 0;
   out[o + 8] = m[2]; out[o + 9] = m[5]; out[o + 10] = m[8]; out[o + 11] = 0;

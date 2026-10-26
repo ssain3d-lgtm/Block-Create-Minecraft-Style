@@ -7,6 +7,11 @@ export interface BlockData {
   material: number;
   rot: number;
   structure: number;
+  /**
+   * Extra per-cell data. For cells covered by a multi-cell shape ("builtin.occupied") it holds the
+   * offset from the shape's anchor cell: dx | dy << 4 | dz << 8 (0..15 each). 0 / absent otherwise.
+   */
+  aux?: number;
 }
 
 export class Chunk {
@@ -14,6 +19,7 @@ export class Chunk {
   readonly material = new Uint16Array(CHUNK_VOL);
   readonly rot = new Uint8Array(CHUNK_VOL);
   readonly structure = new Uint32Array(CHUNK_VOL);
+  readonly aux = new Uint16Array(CHUNK_VOL);
   count = 0;
   constructor(readonly cx: number, readonly cy: number, readonly cz: number) {}
   get key() {
@@ -55,7 +61,7 @@ export class World {
     if (!c) return null;
     const i = localIndex(x, y, z);
     if (c.shape[i] === 0) return null;
-    return { shape: c.shape[i], material: c.material[i], rot: c.rot[i], structure: c.structure[i] };
+    return read(c, i);
   }
 
   /** Sets (or clears with null) a cell. Returns the previous block. */
@@ -63,8 +69,7 @@ export class World {
     const c = this.chunkAt(x, y, z, b !== null);
     if (!c) return null;
     const i = localIndex(x, y, z);
-    const prev: BlockData | null =
-      c.shape[i] === 0 ? null : { shape: c.shape[i], material: c.material[i], rot: c.rot[i], structure: c.structure[i] };
+    const prev: BlockData | null = c.shape[i] === 0 ? null : read(c, i);
     if (!prev && !b) return null;
     const key = cellKey(x, y, z);
     if (prev && prev.structure) this.structIndex.get(prev.structure)?.delete(key);
@@ -73,6 +78,7 @@ export class World {
       c.material[i] = b.material;
       c.rot[i] = b.rot;
       c.structure[i] = b.structure;
+      c.aux[i] = b.aux ?? 0;
       if (!prev) { c.count++; this.blockCount++; }
       if (b.structure) {
         let s = this.structIndex.get(b.structure);
@@ -80,7 +86,7 @@ export class World {
         s.add(key);
       }
     } else {
-      c.shape[i] = 0; c.material[i] = 0; c.rot[i] = 0; c.structure[i] = 0;
+      c.shape[i] = 0; c.material[i] = 0; c.rot[i] = 0; c.structure[i] = 0; c.aux[i] = 0;
       c.count--; this.blockCount--;
       if (c.count === 0) this.chunks.delete(c.key);
     }
@@ -120,7 +126,7 @@ export class World {
       for (let i = 0; i < CHUNK_VOL; i++) {
         if (c.shape[i] === 0) continue;
         const lx = i % CHUNK, lz = Math.floor(i / CHUNK) % CHUNK, ly = Math.floor(i / (CHUNK * CHUNK));
-        cb(bx + lx, by + ly, bz + lz, { shape: c.shape[i], material: c.material[i], rot: c.rot[i], structure: c.structure[i] });
+        cb(bx + lx, by + ly, bz + lz, read(c, i));
       }
     }
   }
@@ -140,7 +146,7 @@ export class World {
     let h1 = 0x811c9dc5 >>> 0, h2 = 0;
     this.forEach((x, y, z, b) => {
       // includes the owning structure: two worlds that differ only in ownership hash differently
-      let v = (cellKey(x, y, z) % 2147483647) ^ Math.imul(b.shape, 73856093) ^ Math.imul(b.material, 19349663) ^ Math.imul(b.rot + 1, 83492791) ^ Math.imul(b.structure + 7, 2654435761 | 0);
+      let v = (cellKey(x, y, z) % 2147483647) ^ Math.imul(b.shape, 73856093) ^ Math.imul(b.material, 19349663) ^ Math.imul(b.rot + 1, 83492791) ^ Math.imul(b.structure + 7, 2654435761 | 0) ^ Math.imul(b.aux ?? 0, 40503);
       v = Math.imul(v ^ (v >>> 16), 0x45d9f3b);
       v = Math.imul(v ^ (v >>> 16), 0x45d9f3b);
       h1 = (h1 + (v >>> 0)) >>> 0;
@@ -158,14 +164,16 @@ export class World {
         material: enc(new Uint8Array(c.material.buffer)),
         rot: enc(c.rot),
         structure: enc(new Uint8Array(c.structure.buffer)),
+        ...(c.aux.some((v) => v !== 0) ? { aux: enc(new Uint8Array(c.aux.buffer)) } : {}),
       });
     }
-    return { encoding: "chunks-rle-b64-le-v1", chunks };
+    return { encoding: "chunks-rle-b64-le-v2", chunks };
   }
 
   static deserialize(data: SerializedWorld): World {
     const w = new World();
-    if (data.encoding !== "chunks-rle-b64-le-v1") throw new Error(`unknown world encoding ${data.encoding}`);
+    // v1 = before multi-cell shapes (no aux array); v2 adds the optional aux array
+    if (data.encoding !== "chunks-rle-b64-le-v1" && data.encoding !== "chunks-rle-b64-le-v2") throw new Error(`unknown world encoding ${data.encoding}`);
     for (const sc of data.chunks) {
       const [cx, cy, cz] = sc.k.split(",").map(Number);
       const c = new Chunk(cx, cy, cz);
@@ -173,6 +181,7 @@ export class World {
       c.material.set(new Uint16Array(dec(sc.material, CHUNK_VOL * 2).buffer));
       c.rot.set(dec(sc.rot, CHUNK_VOL));
       c.structure.set(new Uint32Array(dec(sc.structure, CHUNK_VOL * 4).buffer));
+      if (sc.aux) c.aux.set(new Uint16Array(dec(sc.aux, CHUNK_VOL * 2).buffer));
       const bx = cx * CHUNK, by = cy * CHUNK, bz = cz * CHUNK;
       for (let i = 0; i < CHUNK_VOL; i++) {
         if (c.shape[i] === 0) continue;
@@ -194,8 +203,14 @@ export class World {
   }
 }
 
-export interface SerializedChunk { k: string; shape: string; material: string; rot: string; structure: string }
+export interface SerializedChunk { k: string; shape: string; material: string; rot: string; structure: string; aux?: string }
 export interface SerializedWorld { encoding: string; chunks: SerializedChunk[] }
 
 const enc = (b: Uint8Array) => bytesToB64(rleEncode(b));
 const dec = (s: string, size: number) => rleDecode(b64ToBytes(s), size);
+
+function read(c: Chunk, i: number): BlockData {
+  const b: BlockData = { shape: c.shape[i], material: c.material[i], rot: c.rot[i], structure: c.structure[i] };
+  if (c.aux[i]) b.aux = c.aux[i];
+  return b;
+}

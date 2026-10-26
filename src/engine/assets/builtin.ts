@@ -174,6 +174,7 @@ export const BUILTIN_SHAPES: ShapeDef[] = [
   s("lattice", "창살", { type: "subvoxel", size: 8, mask: latticeMask() }, [], ["window", "grille"], "Thin vertical grille panel (x-y plane)."),
   s("pane", "판유리", { type: "box", min: [0, 0, 0.45], max: [1, 1, 0.55] }, [], ["window", "glass"], "Thin full pane in the x-y plane."),
   s("leaves", "잎덩이", { type: "subvoxel", size: 4, mask: leavesMask() }, [], ["plant", "tree"], "Leafy block with small holes."),
+  { ...s("occupied", "점유 셀", { type: "box", min: [0, 0, 0], max: [1, 1, 1] }, [], ["internal"], "Cell covered by a multi-cell shape (internal)."), internal: true },
   s("lamp_post", "가로등", {
     type: "composite", parts: [
       { recipe: { type: "box", min: [0.42, 0, 0.42], max: [0.58, 0.8, 0.58] } },

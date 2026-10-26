@@ -75,6 +75,18 @@ try {
   const out1 = await page.textContent("#out");
   assert(out1?.includes("+54 blocks"), `AI command panel ran a command (${out1?.slice(0, 60)})`);
 
+  // language switch (Korean <-> English), remembered after reload
+  const label1 = await page.textContent("[data-view=all]");
+  await page.click("[data-act=lang]");
+  await page.waitForTimeout(200);
+  const label2 = await page.textContent("[data-view=all]");
+  const english = label2 === "All" ? true : label1 === "All" ? false : null;
+  assert(label1 !== label2 && english !== null, `language toggle switches the UI (${label1} -> ${label2})`);
+  if (english === false) { await page.click("[data-act=lang]"); await page.waitForTimeout(200); }
+  // now English
+  assert((await page.textContent("#app-name")) === "Small World Atelier", "English header");
+  await page.screenshot({ path: path.join(out, "06-english.png") });
+
   // autosave + reload restores
   await page.waitForTimeout(1800);
   const hash = await page.evaluate(() => (window as any).studio.engine.project.world.hash());
@@ -83,6 +95,7 @@ try {
   await page.waitForTimeout(500);
   const hash2 = await page.evaluate(() => (window as any).studio.engine.project.world.hash());
   assert(hash === hash2, `reload restored the autosave (${hash2})`);
+  assert((await page.textContent("[data-view=all]")) === "All", "the language choice is remembered after reload");
   await waitMeshed(page);
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(out, "05-restored.png") });

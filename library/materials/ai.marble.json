@@ -1,0 +1,20 @@
+{
+  "id": "ai.marble",
+  "name": "대리석",
+  "kind": "stone",
+  "color": "#e4e0d6",
+  "opacity": 1,
+  "pattern": {
+    "type": "noise",
+    "contrast": 0.18
+  },
+  "variants": {
+    "count": 4,
+    "lightness": 0.04
+  },
+  "tags": [
+    "stone",
+    "classical"
+  ],
+  "version": 1
+}

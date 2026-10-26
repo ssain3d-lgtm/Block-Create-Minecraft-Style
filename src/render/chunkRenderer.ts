@@ -11,14 +11,18 @@ import { createAtlasTexture } from "./atlas";
 
 export const REGION = 2; // chunks per region side
 
+/** per-instance atlas tile; uv is in cell units and wrapped per cell in the fragment shader */
 function injectInstanceTile(mat: THREE.Material, span: [number, number]) {
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.tileSpan = { value: new THREE.Vector2(...span) };
     shader.vertexShader = shader.vertexShader
-      .replace("#include <common>", "#include <common>\n#ifdef USE_INSTANCING\nattribute vec2 instTile;\nuniform vec2 tileSpan;\n#endif")
-      .replace("#include <uv_vertex>", "#include <uv_vertex>\n#if defined(USE_INSTANCING) && defined(USE_MAP)\nvMapUv = instTile + uv * tileSpan;\n#endif");
+      .replace("#include <common>", "#include <common>\nattribute vec2 instTile;\nvarying vec2 vInstTile;\nvarying vec2 vCellUv;")
+      .replace("#include <uv_vertex>", "#include <uv_vertex>\nvInstTile = instTile;\nvCellUv = uv;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", "#include <common>\nuniform vec2 tileSpan;\nvarying vec2 vInstTile;\nvarying vec2 vCellUv;")
+      .replace("#include <map_fragment>", "#ifdef USE_MAP\n  diffuseColor *= texture2D( map, vInstTile + fract( vCellUv ) * tileSpan );\n#endif");
   };
-  mat.customProgramCacheKey = () => "inst-tile";
+  mat.customProgramCacheKey = () => "inst-tile-v2";
 }
 
 const recipeKeys = new WeakMap<object, string>();

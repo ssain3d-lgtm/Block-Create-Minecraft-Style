@@ -5,7 +5,7 @@ import type { Engine } from "../engine/engine";
 import type { Vec3 } from "../engine/coords";
 import { ChunkRenderer } from "../render/chunkRenderer";
 import { geometryFor } from "../engine/geometry/recipes";
-import { rotMatrix } from "../render/orient";
+import { instanceMatrix } from "../render/orient";
 
 export type ViewPreset = "all" | "main" | "front" | "side" | "top";
 export type Ambience = "day" | "dusk" | "moon";
@@ -275,23 +275,25 @@ export class Viewport {
 
   showGhost(cell: Vec3 | null, shapeId: string, rot: number) {
     if (!cell) { this.ghost.visible = false; return; }
-    if (shapeId !== this.ghostShape) {
-      const def = this.engine.assets.findShape(shapeId, this.engine.project.meta.assets.shapes);
+    const def = this.engine.assets.findShape(shapeId, this.engine.project.meta.assets.shapes);
+    const key = `${shapeId}@${def?.version ?? 0}`;
+    if (key !== this.ghostShape) {
       const g = new THREE.BufferGeometry();
       if (def) {
         const d = geometryFor(def);
         g.setAttribute("position", new THREE.BufferAttribute(d.positions, 3));
         g.setIndex(new THREE.BufferAttribute(d.indices, 1));
-        g.translate(-0.5, -0.5, -0.5);
       }
       this.ghost.geometry.dispose();
       this.ghost.geometry = g;
-      this.ghostShape = shapeId;
+      this.ghostShape = key;
     }
-    const m = rotMatrix(rot);
-    const mat = new THREE.Matrix4().set(m[0], m[1], m[2], 0, m[3], m[4], m[5], 0, m[6], m[7], m[8], 0, 0, 0, 0, 1);
-    this.ghost.quaternion.setFromRotationMatrix(mat);
-    this.ghost.position.set(cell[0] + 0.5, cell[1] + 0.5, cell[2] + 0.5);
+    // same transform as the renderer: anchor = min corner of the rotated footprint
+    const m = new Float32Array(16);
+    instanceMatrix(cell[0], cell[1], cell[2], rot, m, 0, def?.size ?? [1, 1, 1]);
+    this.ghost.matrixAutoUpdate = false;
+    this.ghost.matrix.fromArray(m);
+    this.ghost.matrixWorldNeedsUpdate = true;
     this.ghost.visible = true;
   }
 

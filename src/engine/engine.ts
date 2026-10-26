@@ -103,6 +103,7 @@ export class Engine {
     }
     const t0 = performance.now();
     const warnings: string[] = [];
+    this.project.clearShapeCache();
     const tx = new Tx(this.project);
     const metaBefore = def.mutates ? JSON.stringify(this.project.meta) : "";
     const ctx: CmdCtx = {

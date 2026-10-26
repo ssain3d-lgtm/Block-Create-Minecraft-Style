@@ -6,7 +6,7 @@ import { createNodeEngine } from "../src/node/host";
 import { Engine } from "../src/engine";
 import { keyToCell } from "../src/engine/coords";
 import { toRequests } from "../src/cli/input";
-import { housePlan, eiffelPlan } from "../examples/plans";
+import { housePlan, eiffelPlan, pavilionPlan } from "../examples/plans";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "vox-plan-"));
 
@@ -127,5 +127,21 @@ describe("A. Eiffel tower plan", () => {
     }
     expect(st.bounds.max[1]).toBeGreaterThan(300);
     console.log(`eiffel: ${st.blocks} blocks, ${st.structures.length} structures, built in ${Math.round(ms)} ms`);
+  });
+});
+
+describe("E. multi-cell parts pavilion", () => {
+  it("builds from AI-designed multi-cell parts with layouts and a repeated component, cleanly", () => {
+    const e = new Engine();
+    runPlan(e, pavilionPlan());
+    const st = e.run("getState");
+    const by = (k: string) => st.structures.find((x: { key: string }) => x.key === k);
+    expect(by("colonnade").blocks).toBe(12 * 4);
+    expect(by("cupola").blocks).toBe(64);
+    expect(by("gates_e").blocks).toBe(3 * 8);
+    expect(st.structures.find((x: { name: string }) => x.name === "아치 회랑").blocks).toBe(4 * (8 + 1));
+    const ins = e.run("inspectProject", {});
+    expect(ins.counts.error + ins.counts.warning).toBe(0);
+    expect(e.run("verifyReplay").match).toBe(true);
   });
 });

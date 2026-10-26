@@ -54,9 +54,18 @@ export class Builder {
     this.origin = b?.origin ?? [0, 0, 0];
   }
 
+  /** generators that place multi-cell shapes on purpose (placeShape) set this */
+  allowMulti = false;
+
   shape(id: string) {
     let v = this.sCache.get(id);
-    if (v === undefined) { v = this.ctx.project.shapeIdx(id); this.sCache.set(id, v); }
+    if (v === undefined) {
+      v = this.ctx.project.shapeIdx(id);
+      if (!this.allowMulti && this.ctx.project.multiDef(v)) {
+        throw new CmdError("MULTI_CELL_SHAPE", `"${id}" is a multi-cell shape; this generator fills cell by cell`, `place it with placeShape (layout grid/line/ring) or inside a component`);
+      }
+      this.sCache.set(id, v);
+    }
     return v;
   }
 

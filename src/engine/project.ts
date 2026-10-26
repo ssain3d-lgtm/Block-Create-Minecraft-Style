@@ -1,6 +1,7 @@
 import { World, BlockData, SerializedWorld } from "./world";
 import { keyToCell, Vec3 } from "./coords";
-import type { LogEntry, ProjectMeta, Structure } from "./types";
+import { OCCUPIED_ID, footprintCells, isMulti, shapeSize, unpackOffset } from "./multicell";
+import type { LogEntry, ProjectMeta, ShapeDef, Structure } from "./types";
 import type { AssetRegistry } from "./assets/registry";
 
 export interface ProjectFile {
@@ -76,6 +77,59 @@ export class Project {
     return i;
   }
 
+  private _multi = new Map<number, ShapeDef | null>();
+  /** shape definition of a palette index if it is multi-cell, else null (cached per command) */
+  multiDef(idx: number): ShapeDef | null {
+    let v = this._multi.get(idx);
+    if (v === undefined) {
+      const def = this.shapeDefAt(idx);
+      v = def && isMulti(def) ? def : null;
+      this._multi.set(idx, v);
+    }
+    return v;
+  }
+  /** call when shape definitions may have changed */
+  clearShapeCache() { this._multi.clear(); this._occ = -1; this._occAny = undefined; }
+
+  private _occ = -1;
+  /** palette index of the internal "occupied" shape (registered on first use) */
+  occIdx(): number {
+    if (this._occ < 0 || this.meta.palette.shapes[this._occ] !== OCCUPIED_ID) {
+      const i = this.meta.palette.shapes.indexOf(OCCUPIED_ID);
+      this._occ = i >= 0 ? i : this.shapeIdx(OCCUPIED_ID);
+      this._occAny = this._occ;
+    }
+    return this._occ;
+  }
+
+  private _occAny: number | undefined;
+  /** palette index of "occupied" if the project uses it, else -1 (never registers) */
+  occIdxIfAny(): number {
+    if (this._occAny === undefined || (this._occAny >= 0 && this.meta.palette.shapes[this._occAny] !== OCCUPIED_ID)) {
+      this._occAny = this.meta.palette.shapes.indexOf(OCCUPIED_ID);
+    }
+    return this._occAny;
+  }
+
+  /**
+   * The shape covering (x,y,z): its anchor cell, its block and every covered cell.
+   * For an ordinary block cells = [that cell].
+   */
+  groupAt(x: number, y: number, z: number): { anchor: Vec3; block: BlockData; cells: Vec3[] } | null {
+    const b = this.world.get(x, y, z);
+    if (!b) return null;
+    let anchor: Vec3 = [x, y, z], ab: BlockData | null = b;
+    if (b.shape === this.occIdxIfAny()) {
+      const o = unpackOffset(b.aux ?? 0);
+      anchor = [x - o[0], y - o[1], z - o[2]];
+      ab = this.world.get(...anchor);
+      if (!ab) return { anchor: [x, y, z], block: b, cells: [[x, y, z]] }; // orphan (should not happen)
+    }
+    const def = this.multiDef(ab.shape);
+    if (!def) return { anchor, block: ab, cells: [anchor] };
+    return { anchor, block: ab, cells: footprintCells(anchor, shapeSize(def), ab.rot) };
+  }
+
   shapeId(idx: number) { return this.meta.palette.shapes[idx]; }
   materialId(idx: number) { return this.meta.palette.materials[idx]; }
 
@@ -112,6 +166,11 @@ export class Project {
   blockAt(x: number, y: number, z: number) {
     const b = this.world.get(x, y, z);
     if (!b) return null;
+    if (b.shape === this.occIdxIfAny()) {
+      // a cell covered by a multi-cell shape: describe the shape and say where its anchor is
+      const g = this.groupAt(x, y, z)!;
+      return { ...this.describeBlock(g.block), partOf: g.anchor };
+    }
     return this.describeBlock(b);
   }
 

@@ -1,0 +1,36 @@
+{
+  "id": "ai.gate_bay",
+  "name": "아치 한 칸",
+  "size": [
+    3,
+    4,
+    1
+  ],
+  "blocks": [
+    {
+      "at": [
+        0,
+        0,
+        0
+      ],
+      "shape": "ai.arch_2x4",
+      "material": "ai.marble",
+      "rot": 0
+    },
+    {
+      "at": [
+        2,
+        0,
+        0
+      ],
+      "shape": "builtin.cube",
+      "material": "builtin.stone_light",
+      "rot": 0
+    }
+  ],
+  "tags": [
+    "arch",
+    "wall"
+  ],
+  "version": 1
+}

@@ -15,6 +15,8 @@ export interface PaletteInfo {
   shapeIds: string[];
   shapeIsCube: Uint8Array;
   shapeSolid: Uint8Array; // [shape * 8 + rot] -> world face mask
+  shapeSize: Int32Array; // [shape * 3 + axis] cells covered (multi-cell shapes)
+  occ: number; // palette index of "occupied" cells (-1 if unused): never drawn
   matColor: Float32Array; // linear-ish rgb 0..1 (sRGB values, converted by renderer)
   matAlpha: Float32Array;
   matBucket: Uint8Array;
@@ -46,9 +48,11 @@ export function buildPalette(p: Project, only?: Set<number> | null): PaletteInfo
   const shapes = p.meta.palette.shapes, mats = p.meta.palette.materials;
   const shapeIsCube = new Uint8Array(shapes.length);
   const shapeSolid = new Uint8Array(shapes.length * 8);
+  const shapeSize = new Int32Array(shapes.length * 3).fill(1);
   shapes.forEach((id, i) => {
     if (i === 0) return;
     const def = p.assets.findShape(id, p.meta.assets.shapes);
+    if (def?.size) { shapeSize[i * 3] = def.size[0]; shapeSize[i * 3 + 1] = def.size[1]; shapeSize[i * 3 + 2] = def.size[2]; }
     shapeIsCube[i] = id === "builtin.cube" ? 1 : 0;
     for (let r = 0; r < 8; r++) shapeSolid[i * 8 + r] = def ? solidMask(def.solidFaces, r) : 0;
   });
@@ -71,9 +75,9 @@ export function buildPalette(p: Project, only?: Set<number> | null): PaletteInfo
   });
   const hidden = new Set(p.meta.structures.filter((s) => !s.visible || (only && !only.has(s.num))).map((s) => s.num));
   if (only) hidden.add(0); // blocks that belong to no structure
-  const assetKey = JSON.stringify([p.meta.assets.materials.map((m) => [m.id, m.version, m.color, m.opacity]), p.meta.assets.shapes.map((s) => [s.id, s.version, JSON.stringify(s.recipe).length])]);
+  const assetKey = JSON.stringify([p.meta.assets.materials.map((m) => [m.id, m.version, m.color, m.opacity]), p.meta.assets.shapes.map((s) => [s.id, s.version, JSON.stringify(s.recipe).length, s.size])]);
   return {
     key: `${shapes.join("|")}#${mats.join("|")}#${[...hidden].join(",")}#${assetKey}`,
-    shapeIds: shapes, shapeIsCube, shapeSolid, matColor, matAlpha, matBucket, matPattern, matVarLight, matVarCount, hidden,
+    shapeIds: shapes, shapeIsCube, shapeSolid, shapeSize, occ: shapes.indexOf("builtin.occupied"), matColor, matAlpha, matBucket, matPattern, matVarLight, matVarCount, hidden,
   };
 }

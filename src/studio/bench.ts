@@ -5,6 +5,7 @@ import type { Engine } from "../engine/engine";
 import type { Viewport } from "./viewport";
 import { SCENES } from "../../bench/scenes";
 import { downloadText } from "./storage";
+import { t as tr } from "./i18n";
 
 export interface BenchResult {
   scene: string;
@@ -36,7 +37,7 @@ export async function runBench(engine: Engine, v: Viewport, ids: string[] | null
   const results: BenchResult[] = [];
   const scenes = SCENES.filter((s) => !ids || ids.includes(s.id));
   for (const scene of scenes) {
-    onProgress(`${scene.label}: 짓는 중…`);
+    onProgress(tr("bench.building", { s: scene.id }));
     await nextFrame();
     let t = performance.now();
     scene.build(engine);
@@ -52,7 +53,7 @@ export async function runBench(engine: Engine, v: Viewport, ids: string[] | null
     syncGpu(v);
     const firstFrameMs = performance.now() - t;
 
-    onProgress(`${scene.label}: ${seconds}초 동안 회전하며 FPS 측정…`);
+    onProgress(tr("bench.fps", { s: scene.id, n: seconds }));
     const target = v.controls.target.clone();
     const radius = v.camera.position.distanceTo(target);
     const height = v.camera.position.y - target.y;
@@ -74,7 +75,7 @@ export async function runBench(engine: Engine, v: Viewport, ids: string[] | null
     const avg = frames.reduce((n, f) => n + f, 0) / frames.length;
     const p99 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.99))];
 
-    onProgress(`${scene.label}: 블록 1000개 편집 측정…`);
+    onProgress(tr("bench.edit", { s: scene.id }));
     const ops = Array.from({ length: 1000 }, (_, i) => ({ op: "set", at: [(i % 40) - 20, 330 + Math.floor(i / 400), Math.floor(i / 40) % 10], material: "brick" }));
     t = performance.now();
     engine.execute({ cmd: "editBlocks", args: { ops } });
@@ -116,10 +117,10 @@ export function showBenchPanel(host: HTMLElement, data: Awaited<ReturnType<typeo
   const div = document.createElement("div");
   div.className = "benchpanel";
   const rows = data.results.map((r) => `<tr><td>${r.scene}</td><td>${r.blocks.toLocaleString()}</td><td>${r.meshMs}</td><td>${r.firstFrameMs}</td><td><b>${r.fpsAvg}</b></td><td>${r.fpsLow1}</td><td>${r.drawCalls}</td><td>${(r.triangles / 1e6).toFixed(2)}M</td><td>${r.edit1000Ms}</td></tr>`).join("");
-  div.innerHTML = `<h3>벤치마크 결과 (실측)</h3>
-    <p>${data.env.gpu}<br>${data.env.screen} · 그림자 ${data.env.shadows ? "켬" : "끔"} · ${data.seconds}초 회전</p>
-    <table><tr><th>장면</th><th>블록</th><th>메시ms</th><th>첫 프레임ms</th><th>평균 FPS</th><th>1% low</th><th>draw</th><th>삼각형</th><th>편집1000ms</th></tr>${rows}</table>
-    <button id="bench-dl">결과 JSON 저장</button> <button id="bench-close">닫기</button>`;
+  div.innerHTML = `<h3>${tr("bench.title")}</h3>
+    <p>${data.env.gpu}<br>${data.env.screen} · ${tr("bench.shadows")} ${data.env.shadows ? tr("on") : tr("off")} · ${tr("bench.orbit", { n: data.seconds })}</p>
+    <table><tr>${tr("bench.cols").split("|").map((c) => `<th>${c}</th>`).join("")}</tr>${rows}</table>
+    <button id="bench-dl">${tr("bench.save")}</button> <button id="bench-close">${tr("close")}</button>`;
   host.appendChild(div);
   div.querySelector("#bench-dl")!.addEventListener("click", () => downloadText(`bench-${data.env.date.slice(0, 10)}.json`, JSON.stringify(data, null, 2)));
   div.querySelector("#bench-close")!.addEventListener("click", () => div.remove());

@@ -47,12 +47,25 @@ On an error, read "hint" (it contains a valid example) and retry with fixed args
      "openings":[{"side":"south","at":5,"width":2,"height":3,"bottom":0,"fill":null}],"windows":{"width":2,"height":2}}},
    {"key":"roof","cmd":"createRoof","args":{"area":{"on":{"ref":"walls"}},"style":"gable","pitch":1,"material":"roof_tile"}}]}],
  "after":[]}
-Full examples: examples/eiffel.plan.json, house.plan.json, castle.plan.json, modern.plan.json.
+Full examples: examples/eiffel.plan.json, house.plan.json, castle.plan.json, modern.plan.json, pavilion.plan.json (multi-cell parts).
 
 ## Shape recipes (createShape)
 box {min,max} | extrude {profile:[[u,v]...],axis:"x"|"z"} (axis x: points are (z,y), tall side at z=0) |
 lathe {profile:[[radius,y]...] bottom->top} | curve {path:[[u,v]...],thickness} | subvoxel {size,mask[y][z]="#.#."} |
-composite {parts:[{recipe,offset,scale,yaw}]} | mesh {positions,indices}. All coordinates inside 0..1.
+composite {parts:[{recipe,offset,scale,yaw}]} | mesh {positions,indices}.
+Coordinates are in CELLS: inside 0..1 for a normal block.
+
+## Multi-cell shapes (bigger parts: arches, domes, columns, statues, furniture)
+- createShape with "size":[w,h,d] (each 1..16) -> coordinates go up to the size, e.g. a 2x4x1 arch uses x 0..2, y 0..4, z 0..1;
+  a 4x4x4 dome: {"type":"lathe","profile":[[1.9,0],[1.9,1.5],[1.2,3.2],[0,4]]} (lathe centre is the middle of the footprint).
+- Place them with placeShape {"shape":"ai.arch_2x4","at":[x,y,z],"facing":"east","layout":{...}}:
+  "at" = min corner of the ROTATED footprint (facing east/west swaps width and depth);
+  layout: {"type":"single"} | {"type":"grid","count":[nx,ny,nz],"step":[sx,sy,sz]} | {"type":"line","to":[x,y,z],"count":n} |
+          {"type":"ring","radius":r,"count":n,"face":"out"|"in"|"fixed"} (ring: "at" is the centre).
+  onCollision: "replace" (default) | "skip" | "error". getShapeInfo {"shape","at","facing"} tells size, footprints and collisions first.
+- Removing or painting any covered cell affects the whole shape. fillRegion tiles a multi-cell shape by its footprint.
+- Cell-by-cell generators (walls, roofs, towers ...) do not take multi-cell shapes; components (createComponent / placeComponent) do.
+- Very large things are built from many parts (structures, components, layouts), not from one huge shape.
 
 ## Materials available
 ${mats}

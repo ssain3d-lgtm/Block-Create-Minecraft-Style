@@ -10,6 +10,7 @@
 //    any mismatch -> resync (one at a time; events received meanwhile are buffered)
 import type { Engine, CommandRequest, CommandResponse } from "../engine/engine";
 import type { Viewport } from "./viewport";
+import { t } from "./i18n";
 
 export interface Link {
   client: string;
@@ -66,7 +67,7 @@ export async function connectServer(engine: Engine, viewport: Viewport, opts: { 
         const d = await api("/api/project");
         engine.loadFile(d.file);
         rev = d.rev;
-        opts.onStatus(`서버와 동기화됨 · ${engine.project.world.blockCount.toLocaleString()}블록`);
+        opts.onStatus(t("link.synced", { b: engine.project.world.blockCount.toLocaleString() }));
       } finally {
         syncing = null;
       }
@@ -103,7 +104,7 @@ export async function connectServer(engine: Engine, viewport: Viewport, opts: { 
             out = await api("/api/command", { method: "POST", body: JSON.stringify({ client, opId: op.opId, baseRev: op.baseRev, requests: [op.req] }) });
             break;
           } catch {
-            opts.onStatus("서버 연결 대기 중 — 편집 내용은 보관 중이며 연결되면 전송합니다");
+            opts.onStatus(t("link.waiting"));
             await new Promise((r) => setTimeout(r, Math.min(5000, 300 * 2 ** attempt)));
           }
         }
@@ -129,7 +130,7 @@ export async function connectServer(engine: Engine, viewport: Viewport, opts: { 
     const d = JSON.parse((ev as MessageEvent).data) as { rev: number; hash: string };
     // (re)connected: if anything happened while we were away, resync (after our queued edits)
     if (d.rev !== rev || d.hash !== engine.project.stateHash()) void resync();
-    opts.onStatus("서버에 연결됨 (AI 명령이 실시간으로 반영됩니다)");
+    opts.onStatus(t("link.connected"));
   });
   es.addEventListener("cmd", (ev) => applyRemote(JSON.parse((ev as MessageEvent).data)));
   es.addEventListener("reload", () => void resync());
@@ -139,7 +140,7 @@ export async function connectServer(engine: Engine, viewport: Viewport, opts: { 
     try { body = { id: d.id, ...viewport.renderViews(d.args) }; } catch (e) { body = { id: d.id, error: (e as Error).message }; }
     await api("/api/render-result", { method: "POST", body: JSON.stringify(body) }).catch(() => {});
   });
-  es.onerror = () => opts.onStatus("서버 연결 끊김 — 다시 연결 중…");
+  es.onerror = () => opts.onStatus(t("link.lost"));
 
   return {
     client,

@@ -1,3 +1,5 @@
+<p align="right"><a href="WINDOWS_TEST.en.md">English</a> · <b>한국어</b></p>
+
 # Windows · RTX 5090 직접 점검 방법
 
 > 이 문서의 항목은 **사용자 PC에서 직접 해야 하는 점검**입니다. 개발 환경(클라우드, GPU 없음)에서는
@@ -15,8 +17,8 @@
 | 명령 | 확인하는 것 | 통과 기준 |
 |---|---|---|
 | `npm run typecheck` | 타입 오류 | 출력 없음 |
-| `npm test` | 엔진·보안·저장·트랜잭션·동기화 단위 테스트 | `Tests  N passed` |
-| `npm run check:studio` | 실제 브라우저에서 블록 추가·삭제·되돌리기·자동 저장 | 모든 줄이 `ok` |
+| `npm test` | 엔진·보안·저장·트랜잭션·동기화·다중 셀 부품 단위 테스트 | `Tests  N passed` |
+| `npm run check:studio` | 실제 브라우저에서 블록 추가·삭제·되돌리기·자동 저장·언어 전환 | 모든 줄이 `ok` |
 | `npm run check:ai` | HTTP API·실시간 연동(탭 2개+AI 동시 편집, 끊김 후 재접속)·스크린샷·MCP | `all AI-side checks passed` |
 | `npm run build` | 배포용 빌드 | `built in …` |
 
@@ -30,6 +32,7 @@ Windows에서는 위 검사가 **실제 GPU**로 브라우저를 띄웁니다(�
 4. 브라우저 탭을 **2개** 열어 한쪽에서 블록을 놓으면 다른 쪽에도 바로 보이는지
 5. 한 탭에서 **Ctrl+Z** → 두 탭 모두 되돌아가는지 (되돌리기는 서버 공용 기록)
 6. `projects\current.vox.json`을 메모장으로 열어 앞부분만 남기고 저장(일부러 손상) → `run.bat` 재시작 → "recovered from current.vox.json.bak1" 메시지와 함께 이전 상태로 열리는지
+8. 오른쪽 위 **EN / 한국어** 버튼으로 화면 언어가 바뀌고, 새로고침 후에도 유지되는지
 7. 다른 사이트에서 접근이 막히는지: 브라우저 주소창에 `http://127.0.0.1:7878/api/state` → `NO_TOKEN`(401)이 나오면 정상
 
 ## 3. RTX 5090 성능 측정 (약 3분)

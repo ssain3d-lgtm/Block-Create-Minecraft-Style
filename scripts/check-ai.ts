@@ -18,7 +18,8 @@ let TOKEN = "";
 const post = async (base: string, body: unknown) => (await fetch(`${base}/api/command`, { method: "POST", headers: { "content-type": "application/json", "x-vox-token": TOKEN }, body: JSON.stringify(body) })).json();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const srv = await startServer({ port: 0, projectPath: path.join(tmp, "current.vox.json"), log: () => {} });
+// isolated project file and asset library: checks never touch the user's projects/ or library/
+const srv = await startServer({ port: 0, projectPath: path.join(tmp, "current.vox.json"), libraryDir: path.join(tmp, "library"), log: () => {} });
 const base = srv.url;
 TOKEN = srv.token;
 const exe = ["/opt/pw-browsers/chromium-1243/chrome-linux64/chrome"].find((p) => fs.existsSync(p));
@@ -137,6 +138,11 @@ try {
   const failed = await mcp.callTool({ name: "execute_plan", arguments: { plan: broken } });
   ok(failed.isError && (failed.content as any)[0].text.includes("floor2"), "MCP execute_plan (newProject) that fails reports the failing structure");
   ok(srv.engine.project.stateHash() === beforeFail, "…and leaves the server project unchanged (no half-made new project)");
+  // MCP: the AI designs a 4x4x4 multi-cell part and places it in a ring
+  const mk = await mcp.callTool({ name: "create_asset", arguments: { kind: "shape", args: { id: "ai.mcp_dome_4", name: "MCP dome", size: [4, 4, 4], recipe: { type: "lathe", profile: [[1.9, 0], [1.9, 1.5], [1.2, 3.2], [0, 4]] } } } });
+  ok(!mk.isError && (mk.content as any)[0].text.includes("4x4x4"), `MCP create_asset multi-cell shape: ${(mk.content as any)[0].text.split("\n")[0]}`);
+  const ring = await mcp.callTool({ name: "run_command", arguments: { cmd: "placeShape", args: { key: "mcp_domes", shape: "ai.mcp_dome_4", at: [0, 20, 0], material: "ai.slate_blue", layout: { type: "ring", radius: 12, count: 6 } } } });
+  ok(!ring.isError && srv.engine.project.structure("mcp_domes") !== undefined, `MCP placeShape ring of 4x4x4 parts: ${(ring.content as any)[0].text.split("\n")[0]}`);
   const ins = await mcp.callTool({ name: "inspect", arguments: {} });
   ok(!ins.isError, `MCP inspect: ${(ins.content as any)[0].text.split("\n")[0]}`);
   const shot = await mcp.callTool({ name: "render_views", arguments: { views: ["iso"], width: 512, height: 384 } });
@@ -148,7 +154,7 @@ try {
   // ---- 8. MCP embedded mode (no server running on that port)
   const mcp2 = new Client({ name: "check2", version: "1" });
   const freePort = String(20000 + Math.floor(Math.random() * 20000));
-  await mcp2.connect(new StdioClientTransport({ command: "npx", args: ["tsx", "src/server/mcp.ts"], env: { ...process.env, VOX_PORT: freePort, VOX_PROJECT: path.join(tmp, "embedded.vox.json") } as Record<string, string>, stderr: "ignore" }));
+  await mcp2.connect(new StdioClientTransport({ command: "npx", args: ["tsx", "src/server/mcp.ts"], env: { ...process.env, VOX_PORT: freePort, VOX_PROJECT: path.join(tmp, "embedded.vox.json"), VOX_LIBRARY: path.join(tmp, "library2") } as Record<string, string>, stderr: "ignore" }));
   const st = await mcp2.callTool({ name: "open_project", arguments: { new: true, name: "embedded" } });
   ok(!st.isError, "MCP embedded server: new project");
   const b = await mcp2.callTool({ name: "run_command", arguments: { cmd: "createTower", args: { center: [0, 0, 0], height: 20, baseSize: 7, topSize: 3, style: "lattice", material: "iron_mid" } } });

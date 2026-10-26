@@ -1,0 +1,20 @@
+{
+  "id": "ai.copper_green",
+  "name": "녹청 구리",
+  "kind": "metal",
+  "color": "#5f9c8a",
+  "opacity": 1,
+  "pattern": {
+    "type": "noise",
+    "contrast": 0.18
+  },
+  "variants": {
+    "count": 4,
+    "lightness": 0.07
+  },
+  "tags": [
+    "roof",
+    "dome"
+  ],
+  "version": 1
+}

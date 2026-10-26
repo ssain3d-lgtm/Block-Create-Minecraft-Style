@@ -243,3 +243,84 @@ export function modernPlan() {
     }],
   };
 }
+
+// ---------------------------------------------------------------- E. multi-cell parts pavilion
+/** Procedural Asset Engine demo: the AI designs multi-cell parts (2x4x1 arch, 1x4x1 column,
+ *  4x4x4 cupola, 3x1x3 fountain basin, 2x1x1 bench), saves a repeatable bay as a component,
+ *  and places everything with grid / ring layouts. */
+export function pavilionPlan() {
+  const col = { // 1x4x1 column: base, shaft, capital
+    id: "ai.column_1x4", name: "기둥 1x4", size: [1, 4, 1], tags: ["column", "classical"],
+    recipe: { type: "lathe", segments: 12, profile: [[0.48, 0], [0.48, 0.25], [0.34, 0.35], [0.3, 3.55], [0.42, 3.7], [0.5, 3.8], [0.5, 4], [0, 4]] },
+  };
+  const arch = { // 2x4x1 doorway arch
+    id: "ai.arch_2x4", name: "아치 2x4", size: [2, 4, 1], tags: ["arch", "door", "wall"],
+    recipe: { type: "extrude", axis: "z", profile: [[0, 0], [0.3, 0], [0.3, 2.6], [0.6, 3.2], [1, 3.4], [1.4, 3.2], [1.7, 2.6], [1.7, 0], [2, 0], [2, 4], [0, 4]] },
+  };
+  const cupola = { // 4x4x4 drum + dome
+    id: "ai.cupola_4", name: "돔 4x4x4", size: [4, 4, 4], tags: ["dome", "roof"],
+    recipe: { type: "lathe", segments: 20, profile: [[1.95, 0], [1.95, 1.2], [1.8, 1.25], [1.78, 2.1], [1.55, 2.8], [1.15, 3.35], [0.6, 3.75], [0.2, 3.95], [0, 4]] },
+  };
+  const basin = { // 3x1x3 fountain basin (ring wall + floor)
+    id: "ai.basin_3", name: "분수대 3x1x3", size: [3, 1, 3], tags: ["fountain", "garden"],
+    recipe: { type: "composite", parts: [
+      { recipe: { type: "lathe", segments: 20, profile: [[1.45, 0], [1.45, 0.75], [1.25, 0.75], [1.25, 0.15], [0, 0.15]] } },
+    ] },
+  };
+  const bench = { // 2x1x1 bench
+    id: "ai.bench_2x1", name: "벤치 2x1", size: [2, 1, 1], tags: ["bench", "garden"],
+    recipe: { type: "composite", parts: [
+      { recipe: { type: "box", min: [0.05, 0.4, 0.15], max: [1.95, 0.52, 0.85] } },
+      { recipe: { type: "box", min: [0.15, 0, 0.3], max: [0.3, 0.4, 0.7] } },
+      { recipe: { type: "box", min: [1.7, 0, 0.3], max: [1.85, 0.4, 0.7] } },
+    ] },
+  };
+  return {
+    plan: "multi_cell_pavilion",
+    newProject: true,
+    name: "다중 셀 정자",
+    title: "pavilion",
+    description: "AI가 설계한 다중 셀 부품(2x4x1 아치, 1x4x1 기둥,\n4x4x4 돔, 3x1x3 분수대)으로 지은 정자.",
+    tags: ["Procedural Asset Engine", "다중 셀 부품"],
+    cellSize: 1,
+    assets: [
+      { cmd: "createShape", args: col },
+      { cmd: "createShape", args: arch },
+      { cmd: "createShape", args: cupola },
+      { cmd: "createShape", args: basin },
+      { cmd: "createShape", args: bench },
+      { cmd: "createMaterial", args: { id: "ai.marble", name: "대리석", kind: "stone", color: "#e4e0d6", variation: 0.04, tags: ["stone", "classical"] } },
+      { cmd: "createMaterial", args: { id: "ai.copper_green", name: "녹청 구리", kind: "metal", color: "#5f9c8a", tags: ["roof", "dome"] } },
+    ] as Cmd[],
+    buildings: [{
+      name: "pavilion", origin: [0, 0, 0], structures: [
+        { key: "lawn", cmd: "createTerrain", args: { name: "잔디", area: { at: [-24, 0, -24], size: [49, 49] }, depth: 2, material: "grass", border: { material: "leaf_dark", width: 1 } } },
+        { key: "plaza", cmd: "createTerrain", args: { name: "원형 광장", area: { at: [-15, 0, -15], size: [31, 31] }, material: "paving", border: { material: "stone_light", width: 1 } } },
+        { key: "podium", cmd: "createFoundation", args: { name: "기단", area: { at: [-7, 1, -7], size: [15, 15] }, height: 2, taper: 1, slope: true, material: "ai.marble" } },
+        // ring of 12 columns on the podium
+        { key: "colonnade", cmd: "placeShape", args: { name: "열주", shape: "ai.column_1x4", at: [0, 3, 0], material: "ai.marble", layout: { type: "ring", radius: 5, count: 12, face: "out" } } },
+        { key: "ring_beam", cmd: "createCylinder", args: { name: "보 링", center: [0, 7, 0], radius: 6, height: 1, hollow: true, thickness: 2, material: "ai.marble" } },
+        { key: "roof_disc", cmd: "createCylinder", args: { name: "지붕판", center: [0, 8, 0], radius: 5, height: 1, material: "ai.marble" } },
+        // the 4x4x4 cupola sits on the roof, anchored at its min corner
+        { key: "cupola", cmd: "placeShape", args: { name: "돔", shape: "ai.cupola_4", at: [-2, 9, -2], material: "ai.copper_green" } },
+        { key: "lantern", cmd: "createPillar", args: { name: "꼭대기 등", at: [0, 13, 0], height: 1, shape: "lamp_post", material: "lamp" } },
+        // garden walls with arched gates on four sides (arches: grid layout along each wall)
+        // low wall with openings where the arches stand (so nothing overlaps)
+        { key: "wall_s", cmd: "createWall", args: { name: "남쪽 담", from: [-14, 1, 14], to: [14, 1, 14], height: 1, material: "stone_light",
+          openings: [5, 13, 21].map((at) => ({ at, width: 2, height: 1, bottom: 0, fill: null })) } },
+        { key: "gates_s", cmd: "placeShape", args: { name: "남쪽 아치", shape: "ai.arch_2x4", at: [-9, 1, 14], material: "ai.marble", layout: { type: "grid", count: [3, 1, 1], step: [8, 0, 0] } } },
+        { key: "gates_n", cmd: "placeShape", args: { name: "북쪽 아치", shape: "ai.arch_2x4", at: [-9, 1, -14], material: "ai.marble", layout: { type: "grid", count: [3, 1, 1], step: [8, 0, 0] } } },
+        { key: "gates_e", cmd: "placeShape", args: { name: "동쪽 아치", shape: "ai.arch_2x4", at: [14, 1, -9], facing: "east", material: "ai.marble", layout: { type: "grid", count: [1, 1, 3], step: [0, 0, 8] } } },
+        { key: "gates_w", cmd: "placeShape", args: { name: "서쪽 아치", shape: "ai.arch_2x4", at: [-14, 1, -9], facing: "west", material: "ai.marble", layout: { type: "grid", count: [1, 1, 3], step: [0, 0, 8] } } },
+        { key: "fountains", cmd: "placeShape", args: { name: "분수대", shape: "ai.basin_3", at: [0, 1, 0], material: "stone_light", layout: { type: "ring", radius: 13, count: 4, face: "fixed", startAngle: 45 } } },
+        { key: "benches", cmd: "placeShape", args: { name: "벤치", shape: "ai.bench_2x1", at: [0, 1, 0], material: "wood_dark", layout: { type: "ring", radius: 9, count: 8, face: "in", startAngle: 22.5 } } },
+        { key: "trees", cmd: "createTree", args: { name: "나무", positions: [[-20, 1, -20], [20, 1, -20], [-20, 1, 20], [20, 1, 20], [-20, 1, 0], [20, 1, 0], [0, 1, -20], [0, 1, 20]], height: 4, crown: 2, style: "cone", material: "leaf_teal" } },
+      ] as S[],
+    }],
+    after: [
+      // reuse: capture one arch bay (arch + wall) as a component, then repeat it as a pergola
+      { cmd: "createComponent", args: { id: "ai.gate_bay", name: "아치 한 칸", from: [-9, 1, 14], to: [-7, 4, 14], tags: ["arch", "wall"] } },
+      { cmd: "placeComponent", args: { id: "ai.gate_bay", at: [-21, 1, -6], facing: "east", repeat: { count: [1, 1, 4], step: [0, 0, 4] }, structure: { name: "아치 회랑", type: "wall" } } },
+    ],
+  };
+}
