@@ -71,6 +71,8 @@ export class ChunkRenderer {
   private pal: PaletteInfo | null = null;
   /** set when project meta may have changed (palette, materials, visibility) */
   paletteDirty = true;
+  /** when set, only these structure numbers are drawn (render "isolate") */
+  only: Set<number> | null = null;
   shadows = true;
   totalBlocks = 0;
   visibleBlocks = 0;
@@ -146,7 +148,7 @@ export class ChunkRenderer {
     const p = this.getProject();
     const w = p.world;
     if (this.paletteDirty || !this.pal) {
-      const pal = buildPalette(p);
+      const pal = buildPalette(p, this.only);
       if (!this.pal || this.pal.key !== pal.key) {
         // palette / material / visibility change -> everything is re-meshed
         for (const k of this.chunkData.keys()) w.dirty.add(k);

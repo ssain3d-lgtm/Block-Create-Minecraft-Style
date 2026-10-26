@@ -125,7 +125,7 @@ export function eiffelPlan() {
   ];
   // landscape (Champ de Mars style)
   const trees: number[][] = [];
-  for (let x = -66; x <= 66; x += 8) for (const z of [70, 82]) if (Math.abs(x) > 14) trees.push([x, 1, z]);
+  for (let x = 18; x <= 66; x += 8) for (const z of [70, 82]) trees.push([x, 1, z], [-x, 1, z]);
   for (let z = -60; z <= 60; z += 10) for (const x of [-82, 82]) trees.push([x, 1, z]);
   const lamps: number[][] = [];
   for (let i = -60; i <= 60; i += 15) { lamps.push([i, 1, 64], [i, 1, -64], [64, 1, i], [-64, 1, i]); }
@@ -138,7 +138,7 @@ export function eiffelPlan() {
     { key: "pool", cmd: "createCylinder", args: { name: "분수 연못", center: [0, 0, 76], radius: 7, height: 1, material: "water" } },
     { key: "pool_rim", cmd: "createCylinder", args: { name: "연못 테두리", center: [0, 1, 76], radius: 8, height: 1, hollow: true, material: "stone_light" } },
     { key: "trees", cmd: "createTree", args: { name: "가로수", positions: trees, height: 4, crown: 2, material: "leaf" } },
-    { key: "trees2", cmd: "createTree", args: { name: "정원수", positions: [[-54, 1, -24], [-54, 1, -6], [-54, 1, 12], [55, 1, -24], [55, 1, -6], [55, 1, 12]], height: 3, crown: 2, material: "leaf_teal", style: "round" } },
+    { key: "trees2", cmd: "createTree", args: { name: "정원수", positions: [[-54, 1, -24], [-54, 1, -6], [-54, 1, 12], [54, 1, -24], [54, 1, -6], [54, 1, 12]], height: 3, crown: 2, material: "leaf_teal", style: "round" } },
     { key: "lamps", cmd: "createPillar", args: { name: "가로등", positions: lamps, height: 1, shape: "lamp_post", material: "lamp" } },
   ];
   return {
@@ -187,7 +187,8 @@ export function castlePlan() {
         { key: "outer_wall", cmd: "createWall", args: { name: "성벽", loop: { at: [-11, 1, -11], size: [56, 50] }, height: 3, material: "plaster", bands: [{ y: 0, material: "stone_dark" }, { y: 2, material: "roof_tile" }], openings: [{ side: "south", at: 25, width: 4, height: 3, bottom: 0, fill: null }] } },
         { key: "bridge", cmd: "createFloor", args: { name: "다리", area: { at: [14, 1, 38], size: [4, 8] }, material: "wood_dark", shape: "floor" } },
         { key: "base", cmd: "createFoundation", args: { name: "석축", area: { at: [0, 1, 0], size: [34, 28] }, height: 8, taper: 0.5, slope: true, material: "stone", topMaterial: "stone_light", tags: ["main"] } },
-        ...tier(1, "base", 1, 5, { style: "hip", pitch: 0.5, curve: 0.7 }),
+        // the stone base tapers 0.5 per layer -> its top layer is 3 cells in; walls sit on it
+        ...tier(1, "base", 3, 5, { style: "hip", pitch: 0.5, curve: 0.7 }),
         ...tier(2, "t1", 3, 5, { style: "hip", pitch: 0.5, curve: 0.7 }),
         ...tier(3, "t2", 3, 5, { style: "irimoya", pitch: 0.75, curve: 0.9 }),
         { key: "pines", cmd: "createTree", args: { name: "소나무", positions: [[-6, 1, -6], [40, 1, -6], [-6, 1, 34], [40, 1, 34], [6, 1, 34], [30, 1, -6]], height: 4, crown: 2, style: "cone", material: "leaf_teal" } },

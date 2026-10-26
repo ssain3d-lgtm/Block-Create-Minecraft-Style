@@ -19,12 +19,36 @@ usage:
   vox describe <command>                  JSON schema of a command
   vox state --project <file>              project summary
   vox verify --project <file>             rebuild from the command log and compare
+  vox inspect --project <file>            automatic quality checks
+  vox render --project <file> [--views front,iso] [--out dir] [--labels]
+                                          screenshots through a headless browser
+  vox glb --project <file> --out model.glb
 
 options:
   --project <file>   load this project first (if it exists) and save it afterwards
   --quiet            print only summaries
 `);
   process.exit(0);
+}
+
+async function render(projectPath: string | undefined, views: string, outDir: string, labels: boolean) {
+  if (!projectPath || !fs.existsSync(projectPath)) { console.error("render needs --project <existing file>"); process.exit(1); }
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const { startServer } = await import("../server/server");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vox-render-"));
+  fs.copyFileSync(projectPath, path.join(tmp, "p.vox.json"));
+  const s = await startServer({ port: 0, projectPath: path.join(tmp, "p.vox.json"), log: () => {} });
+  try {
+    const { responses } = await s.handle([{ cmd: "renderScene", args: { views: views.split(","), labels } }]);
+    const r = responses[0];
+    if (!r.ok) { print(r, true); process.exitCode = 1; return; }
+    fs.mkdirSync(outDir, { recursive: true });
+    for (const [v, f] of Object.entries(r.result.files as Record<string, string>)) fs.copyFileSync(f, path.join(outDir, `${v}.png`));
+    console.log(`ok  rendered ${Object.keys(r.result.files).join(", ")} -> ${outDir}`);
+  } finally {
+    await s.close();
+  }
 }
 
 function main(argv: string[]) {
@@ -42,6 +66,12 @@ function main(argv: string[]) {
   if (quiet) args.splice(quietIdx, 1);
   const [sub, payload] = args;
   if (!sub || sub === "help" || sub === "--help") usage();
+  if (sub === "render") {
+    const views = flag("--views") ?? "front,back,left,right,top,iso";
+    const outDir = flag("--out") ?? "shots/cli";
+    render(projectPath, views, outDir, args.includes("--labels")).then(() => process.exit(process.exitCode ?? 0));
+    return;
+  }
 
   const engine = createNodeEngine();
   if (projectPath && fs.existsSync(projectPath)) {
@@ -70,6 +100,12 @@ function main(argv: string[]) {
       break;
     case "verify":
       requests = [{ cmd: "verifyReplay" }];
+      break;
+    case "inspect":
+      requests = [{ cmd: "inspectProject" }];
+      break;
+    case "glb":
+      requests = [{ cmd: "exportGLB", args: { path: flag("--out") ?? "out/model.glb" } }];
       break;
     default:
       usage();

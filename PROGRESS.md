@@ -3,7 +3,7 @@
 > 세션이 끊기면 이 파일부터 읽고 "다음 작업"부터 이어간다. 설계 기준은 `DESIGN.md`.
 
 ## 현재 단계
-5단계 — 성능·벤치마크 / 완료 (다음: 6단계 AI 연결·검수)
+6단계 — AI 연결·검수 / 완료 · 지시서의 P0·P1 전부, P2 대부분 완료 (남은 것은 "미완료" 참고)
 
 ## 완료
 - [x] World/Chunk(16³, 희소 저장, 구조물 인덱스, dirty 청크 표시) — `test/engine.test.ts`
@@ -43,14 +43,32 @@
 - [x] 벤치마크 3종: `npm run bench:engine`(CPU), `npm run bench:browser`(Playwright), 사용자 PC용 `bench.bat` / `?bench=1`(본인 브라우저·GPU로 FPS 실측, 결과 표 + JSON 저장)
 - [x] 검토 결과 정리: InstancedMesh(사용), 청크 관리(사용), 프러스텀 컬링(영역 단위, Three 기본), 지오메트리 배칭(영역 묶음), 숨은 면 제거(사용), 증분 업데이트(사용), Greedy Meshing(보류 — 아래 결정 기록), Web Worker(보류 — 메시 생성이 충분히 빨라 프레임 예산으로 분산)
 
+- [x] 자동 검수 `inspectProject` / `inspectStructure`: 떠 있는 블록(26방향 연결), MISSING_CELLS(생성기 기준 대비 사라진 칸 + 누가 가져갔는지), 빈 구조물, 깨진 자산 참조, 좌우 대칭 점수. 문제마다 fixHint 명령 — `test/ai-tools.test.ts`
+  - 검수기가 실제로 찾아 고친 것: 일본 성 1층 벽이 좁아지는 석축 바깥에 떠 있던 문제, 에펠탑 대칭 61%→99.9%(반올림 방향·짝수 폭), 나무 잎 구멍으로 생긴 떠 있는 블록
+- [x] `renderScene`: 정면·후면·좌·우·위·사선, 구조물 id 라벨, isolate(특정 구조물만), 카메라·라벨 위치 메타 → `shots/<시각>/` 저장. 열린 스튜디오 탭이 있으면 그 탭(GPU)으로, 없으면 헤드리스 브라우저로 렌더
+- [x] HTTP 서버 + 스튜디오를 한 주소로(`npm run serve` / `run.bat`, http://127.0.0.1:7878): `/api/command`(명령·배열·플랜), `/api/guide`, `/api/commands`, `/api/state`, `/api/project`, `/api/events`(SSE)
+- [x] 실시간 연동: AI가 서버에 보낸 명령이 열린 스튜디오에 바로 반영, 스튜디오 편집·되돌리기도 서버로. 매 명령 후 월드 해시를 비교해 어긋나면 서버 기준으로 자동 재동기화
+- [x] MCP 서버(`mcp.bat` / `npm run mcp`, 도구 15개). 서버가 켜져 있으면 그 서버를 쓰고, 없으면 스스로 서버를 띄움 — `scripts/check-ai.ts`로 원격·내장 두 방식 모두 검증
+- [x] `getGuide`: LLM용 한 페이지 안내서(단위·좌표·앵커·플랜 형식·작업 순서·재질·형상·모든 명령 예시)
+- [x] GLB 내보내기(`exportGLB`, 스튜디오 GLB 버튼, `vox glb`): 미터 단위, 정점 색, 숨은 면 제거, 일부 구조물만도 가능
+- [x] CLI 추가: `vox inspect`, `vox render`, `vox glb`
+- [x] executePlan dryRun: 새 프로젝트용 플랜은 빈 임시 프로젝트에서 검사
+- [x] 모든 명령의 예시가 스키마를 통과하는지 테스트
+
 ## 진행 중
 - (없음)
 
 ## 미완료
-- [ ] 5단계 성능 벤치마크 / 6단계 AI 연결(HTTP·MCP)·검수(inspect·스크린샷)·GLB
+- [ ] **GPU FPS 실측** — 이 작업 환경에는 GPU가 없음. 사용자 PC에서 `bench.bat` 실행 후 결과 JSON을 `bench/results/`에 추가
+- [ ] 외부 Vision LLM 자동 루프 — API(renderScene 이미지 + 라벨 위치 + modifyStructure)는 준비됨. 특정 비전 모델을 호출하는 반복 실행기는 만들지 않음(특정 AI 서비스에 묶이지 않기 위해)
+- [ ] 타임랩스(명령 기록 단계별 이미지/영상), Schematic(.schem) 내보내기 — 지시서 P2, 미착수
+- [ ] Greedy Meshing, Web Worker 메시 생성 — 측정 결과 필요성이 낮아 보류(결정 기록 참고). GPU 실측에서 병목이 보이면 착수
+- [ ] 형상 footprint 다칸(최대 4×4×4) — 현재 모든 형상은 1칸. 큰 부품은 component로 대신함
 
 ## 실행 방법
-- Windows: `run.bat` 더블클릭 → 브라우저에서 http://localhost:5173
+- Windows: `run.bat` 더블클릭 → 브라우저에서 http://127.0.0.1:7878 (스튜디오 + AI API, 작업은 `projects/current.vox.json`에 자동 저장)
+- AI 클라이언트: `mcp.bat` (설정 예시는 README.md)
+- 검사: `npm test` · `npm run check:studio` · `npm run check:ai`
 ```
 npm install
 npm test
@@ -80,7 +98,9 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 **GPU FPS: 아직 미측정.** 사용자 PC에서 `bench.bat` 실행 → 결과 표의 "결과 JSON 저장"으로 받아 `bench/results/`에 넣는다.
 
 ## 다음 작업 (재개 시 여기부터)
-1. 6단계: inspectProject/inspectStructure(떠 있는 블록·겹침·누락·대칭·빈 구조물), renderScene(6방향 스크린샷 + 메타), HTTP API 서버 + 스튜디오 실시간 연결, MCP 서버(도구 15개 이내 + get_guide), GLB 내보내기
+1. 사용자 PC에서 `bench.bat`으로 GPU FPS 실측 → `bench/results/`에 기록, 병목에 따라 Greedy/Worker 결정
+2. 로컬 LLM(Qwen 등)으로 MCP 실사용 테스트: "에펠탑 만들어 줘" → 실패하는 지점을 guide·오류 hint·도구 설명에 반영
+3. 타임랩스, Schematic 내보내기(P2)
 
 ## 결정 기록
 - 2026-10-26: npm workspaces 대신 **단일 패키지 + 폴더 분리**(`src/engine`, `src/render`, `src/studio`, `src/cli`, `src/node`, `src/server`). Windows에서 설치·실행이 단순해서. `src/engine`은 three/node 모듈을 import하지 않는다(브라우저·Node 공용).
@@ -89,5 +109,7 @@ npm run vox -- cmd "{\"cmd\":\"fillRegion\",\"args\":{\"from\":[0,0,0],\"to\":[9
 - 2026-10-26: Web Worker 메시 생성 보류 — 에펠탑 전체 메시가 CPU에서 약 0.3초(청크당 0.7ms), 프레임당 10ms 예산으로 나눠 처리하면 화면이 멈추지 않는다.
 - 2026-10-26: Greedy Meshing은 보류. 블록마다 색 흔들림·텍스처 변형이 있어 합칠 수 있는 면이 적고, 숨은 면 제거만으로 면 수가 크게 줄어든다. 5단계 실측 후 필요하면 같은 색 면만 합치는 방식으로 추가.
 - 2026-10-26: 브라우저 검사는 시스템 Chromium + SwiftShader(소프트웨어 GL)로 돈다. 이 환경의 FPS는 GPU 성능이 아니므로 성능 수치로 쓰지 않는다.
+- 2026-10-26: 스튜디오와 서버 연동은 "로컬 우선 + 미러링 + 해시 검증" 방식. 명령이 결정적이라 같은 명령을 양쪽에서 실행하면 같은 결과가 나오고, 어긋나면 서버 기준으로 다시 불러온다.
+- 2026-10-26: renderScene은 엔진이 아니라 서버가 처리(화면이 필요해서). 엔진 단독 호출 시 NO_VIEWER 오류와 방법(hint)을 돌려준다.
 - 2026-10-26: 자산 버전은 프로젝트 기준으로 매긴다(재실행 시 결정적). 재실행 엔진은 라이브러리에 쓰지 않는다.
 - 2026-10-26: zod v4 사용, JSON Schema는 `z.toJSONSchema`로 생성.

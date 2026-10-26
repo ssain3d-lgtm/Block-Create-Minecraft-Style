@@ -113,3 +113,4 @@ textarea.cmd { width: 100%; height: 110px; resize: vertical; border: 1px solid v
 .benchpanel td, .benchpanel th { border-bottom: 1px solid var(--line); padding: 4px 8px; text-align: right; white-space: nowrap; }
 .benchpanel td:first-child, .benchpanel th:first-child { text-align: left; }
 .benchpanel button { border: 1px solid var(--line-strong); background: #fff; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+.status .link { color: var(--accent); font-weight: 500; }

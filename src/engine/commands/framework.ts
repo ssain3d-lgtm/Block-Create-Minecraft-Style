@@ -9,6 +9,7 @@ export { CmdError };
 export interface Host {
   readText(path: string): string;
   writeText(path: string, text: string): void;
+  writeBytes?(path: string, bytes: Uint8Array): void;
   exists?(path: string): boolean;
 }
 

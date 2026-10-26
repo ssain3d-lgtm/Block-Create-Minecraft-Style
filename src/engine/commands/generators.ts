@@ -6,6 +6,11 @@ import { Builder, defineGenerator, FACING_VEC, facingFromVec, Rect, zCommon, zFo
 
 const zInt = z.number().int();
 
+/** rounds half away from zero so mirrored coordinates stay mirrored (-27.5 -> -28, 27.5 -> 28) */
+export const roundSym = (v: number) => Math.sign(v) * Math.round(Math.abs(v));
+/** nearest odd size, so a square stays centred on its cell */
+export const oddSize = (v: number) => Math.max(1, 2 * Math.round((v - 1) / 2) + 1);
+
 // ---------------- building ----------------
 export const createBuilding = defineCommand({
   name: "createBuilding",
@@ -336,7 +341,7 @@ export const createTower = defineGenerator({
   name: "createTower",
   type: "tower",
   description:
-    "Square tower that can taper (profile taper/curve). style solid | shell | lattice (iron lattice: corner columns + X braces + horizontal frames, like the Eiffel tower's upper part).",
+    "Square tower that can taper (profile taper/curve; sizes are rounded to odd numbers so it stays centred). style solid | shell | lattice (iron lattice: corner columns + X braces + horizontal frames, like the Eiffel tower's upper part).",
   schema: z.object({
     ...zCommon,
     center: zPos.describe("centre of the base"),
@@ -360,7 +365,7 @@ export const createTower = defineGenerator({
     for (let i = 0; i < a.height; i++) {
       const t = a.height === 1 ? 0 : i / (a.height - 1);
       const k = a.profile === "straight" ? 0 : a.profile === "taper" ? t : 1 - Math.pow(1 - t, a.curve);
-      const size = Math.max(1, Math.round(a.baseSize + (top - a.baseSize) * k));
+      const size = oddSize(a.baseSize + (top - a.baseSize) * k);
       const h = Math.floor(size / 2);
       const x0 = c[0] - h, x1 = x0 + size - 1, z0 = c[2] - h, z1 = z0 + size - 1, y = c[1] + i;
       const frame = a.style === "lattice" && a.frameEvery > 0 && (i % a.frameEvery === 0 || i === a.height - 1);
@@ -379,7 +384,8 @@ export const createTower = defineGenerator({
           const uFace = edgeZ ? x - x0 : z - z0;
           const P = a.bracePeriod;
           const ph = ((i % P) + P) % P;
-          const um = ((uFace % P) + P) % P;
+          // measured from the face centre so the bracing is mirror-symmetric
+          const um = Math.abs(uFace - h) % P;
           if (um === ph || um === (P - ph) % P) {
             const face: Facing = z === z0 ? "north" : z === z1 ? "south" : x === x1 ? "east" : "west";
             const accent = a.accent && a.accent.face === face && Math.abs(uFace - h) <= 0;
@@ -468,7 +474,7 @@ export const createTruss = defineGenerator({
   name: "createTruss",
   type: "truss",
   description:
-    "Box-section iron lattice along a polyline path (legs, girders, bridges). width can taper [start,end]. pattern x | warren | solid | open; frameEvery adds full rings (panel look); accent paints the centre line of one face (e.g. red stair rails).",
+    "Box-section iron lattice along a polyline path (legs, girders, bridges). width can taper [start,end] (odd sizes keep it centred). pattern x | warren | solid | open; frameEvery adds full rings (panel look); accent paints the centre line of one face (e.g. red stair rails).",
   schema: z.object({
     ...zCommon,
     path: z.array(zPos).min(2).max(200),
@@ -512,9 +518,9 @@ export const createTruss = defineGenerator({
       const val = first + s * step;
       const c = centerAt(val);
       const t = total === 0 ? 0 : s / total;
-      const w = Math.max(1, Math.round(w0 + (w1 - w0) * t));
+      const w = oddSize(w0 + (w1 - w0) * t);
       const h = Math.floor(w / 2);
-      const cu0 = Math.round(c[u]) - h, cv0 = Math.round(c[v]) - h;
+      const cu0 = roundSym(c[u]) - h, cv0 = roundSym(c[v]) - h;
       const cu1 = cu0 + w - 1, cv1 = cv0 + w - 1;
       const P = a.period ?? Math.max(2, w - 1);
       const frame = a.frameEvery > 0 && (s % a.frameEvery === 0 || s === total);
@@ -530,7 +536,7 @@ export const createTruss = defineGenerator({
           if (isChord || w <= 2 || a.pattern === "solid" || frame) mat = isChord ? chord : a.material;
           else if (a.pattern !== "open") {
             const along = eu ? j - cv0 : i - cu0; // position across the face
-            const ph = ((s % P) + P) % P, m = ((along % P) + P) % P;
+            const ph = ((s % P) + P) % P, m = Math.abs(along - h) % P; // from the face centre: mirror-symmetric
             if (m === ph || (a.pattern === "x" && m === (P - ph) % P)) mat = a.material;
           }
           if (a.accent) {
@@ -659,9 +665,9 @@ export const createTree = defineGenerator({
   example: { key: "trees", positions: [[10, 1, 10], [16, 1, 10], [22, 1, 10]], height: 4, crown: 2, material: "leaf" },
   build(b, a) {
     const list = a.positions ?? [a.at!];
-    list.forEach((p, ti) => {
+    list.forEach((p) => {
       const c = b.pos(p);
-      const rnd = rand(a.seed * 977 + ti * 131 + c[0] * 7 + c[2] * 13);
+      const rnd = rand(a.seed * 977 + Math.abs(c[0]) * 7 + c[2] * 13); // |x| keeps mirrored trees identical
       const th = a.height + (rnd() < 0.5 ? 0 : 1);
       for (let y = 0; y < th; y++) b.set(c[0], c[1] + y, c[2], a.trunk, a.crown >= 2 ? "pillar" : "post");
       const r = a.crown;
@@ -675,8 +681,9 @@ export const createTree = defineGenerator({
             else if (a.style === "cone") { const rr = r * (1 - (dy + r) / (span + r + 1)) + 0.4; inside = dy >= -r && Math.hypot(dx, dz) <= rr; }
             else inside = Math.hypot(dx, dy * 1.15, dz) <= r + 0.45;
             if (!inside) continue;
-            if (rnd() < 0.06) continue; // a few holes
             const surface = Math.hypot(dx, dy, dz) > r - 0.9;
+            // a few holes on the round crown's sides only (never the trunk column, so nothing floats)
+            if (a.style === "round" && surface && (dx !== 0 || dz !== 0) && rnd() < 0.06) continue;
             b.setIfEmpty(c[0] + dx, cy + dy, c[2] + dz, a.material, surface ? "leaves" : "cube");
           }
     });

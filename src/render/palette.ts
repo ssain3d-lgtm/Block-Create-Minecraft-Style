@@ -42,7 +42,7 @@ export function patternIndex(m: MaterialDef | undefined): number {
   return i < 0 ? 0 : i;
 }
 
-export function buildPalette(p: Project): PaletteInfo {
+export function buildPalette(p: Project, only?: Set<number> | null): PaletteInfo {
   const shapes = p.meta.palette.shapes, mats = p.meta.palette.materials;
   const shapeIsCube = new Uint8Array(shapes.length);
   const shapeSolid = new Uint8Array(shapes.length * 8);
@@ -69,7 +69,8 @@ export function buildPalette(p: Project): PaletteInfo {
     matVarLight[i] = def?.variants?.lightness ?? 0.06;
     matVarCount[i] = Math.max(1, Math.min(8, def?.variants?.count ?? 4));
   });
-  const hidden = new Set(p.meta.structures.filter((s) => !s.visible).map((s) => s.num));
+  const hidden = new Set(p.meta.structures.filter((s) => !s.visible || (only && !only.has(s.num))).map((s) => s.num));
+  if (only) hidden.add(0); // blocks that belong to no structure
   const assetKey = JSON.stringify([p.meta.assets.materials.map((m) => [m.id, m.version, m.color, m.opacity]), p.meta.assets.shapes.map((s) => [s.id, s.version, JSON.stringify(s.recipe).length])]);
   return {
     key: `${shapes.join("|")}#${mats.join("|")}#${[...hidden].join(",")}#${assetKey}`,

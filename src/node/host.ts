@@ -1,6 +1,7 @@
 // Node-only helpers: file host for save/load and the shared asset library folder.
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Host } from "../engine/commands/framework";
 import type { AssetStore, AssetKind, AnyAsset } from "../engine/assets/registry";
 import type { ComponentDef, MaterialDef, ShapeDef } from "../engine/types";
@@ -13,6 +14,10 @@ export function nodeHost(baseDir = process.cwd()): Host {
     writeText: (p, text) => {
       fs.mkdirSync(path.dirname(abs(p)), { recursive: true });
       fs.writeFileSync(abs(p), text, "utf8");
+    },
+    writeBytes: (p, bytes) => {
+      fs.mkdirSync(path.dirname(abs(p)), { recursive: true });
+      fs.writeFileSync(abs(p), bytes);
     },
     exists: (p) => fs.existsSync(abs(p)),
   };
@@ -46,7 +51,7 @@ export function folderLibrary(dir: string): AssetStore {
 
 export function repoRoot(): string {
   // src/node/host.ts -> repo root
-  return path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..", "..");
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 }
 
 export function createNodeEngine(opts: { baseDir?: string; libraryDir?: string } = {}) {

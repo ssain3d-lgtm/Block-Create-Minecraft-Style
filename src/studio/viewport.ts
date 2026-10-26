@@ -295,6 +295,85 @@ export class Viewport {
     this.ghost.visible = true;
   }
 
+  /**
+   * Renders several fixed views for AI inspection. Returns PNG data URLs plus meta
+   * (camera, visible structures and their on-screen label positions).
+   */
+  renderViews(opts: { views: string[]; isolate?: string[]; labels?: boolean; width?: number; height?: number }) {
+    const p = this.engine.project;
+    const w = opts.width ?? 1024, h = opts.height ?? 768;
+    const only = opts.isolate?.length ? new Set(opts.isolate.map((id) => p.structure(id)?.num).filter((n): n is number => !!n)) : null;
+    const prevSize = new THREE.Vector2();
+    this.renderer.getSize(prevSize);
+    const prevPos = this.camera.position.clone(), prevTarget = this.controls.target.clone(), prevAspect = this.camera.aspect;
+    const prevRatio = this.renderer.getPixelRatio();
+    this.chunks.only = only;
+    this.chunks.paletteDirty = true;
+    this.chunks.flush();
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    const hv = this.highlight.visible, gv = this.ghost.visible;
+    this.highlight.visible = false; this.ghost.visible = false;
+    // focus box: isolated structures or the whole world
+    let box = p.world.bounds();
+    if (only) {
+      const boxes = p.meta.structures.filter((s) => only.has(s.num)).map((s) => p.structureBox(s)).filter((b): b is NonNullable<typeof b> => !!b);
+      if (boxes.length) box = { min: [0, 1, 2].map((i) => Math.min(...boxes.map((b) => b.min[i]))) as Vec3, max: [0, 1, 2].map((i) => Math.max(...boxes.map((b) => b.max[i]))) as Vec3 };
+    }
+    if (!box) box = { min: [-8, 0, -8], max: [8, 8, 8] };
+    const dirs: Record<string, THREE.Vector3> = {
+      front: new THREE.Vector3(0, 0.05, 1), back: new THREE.Vector3(0, 0.05, -1), left: new THREE.Vector3(-1, 0.05, 0), right: new THREE.Vector3(1, 0.05, 0),
+      top: new THREE.Vector3(0, 1, 0.001), iso: new THREE.Vector3(1, 0.8, 1),
+    };
+    const images: Record<string, string> = {};
+    const meta: Record<string, unknown> = {};
+    const structs = p.meta.structures.filter((s) => s.visible && (!only || only.has(s.num)) && s.box);
+    for (const v of opts.views) {
+      this.focusBox(box.min, box.max, dirs[v] ?? dirs.iso, false);
+      this.controls.update();
+      this.camera.updateMatrixWorld();
+      this.renderer.render(this.scene, this.camera);
+      const labels: { id: string; name: string; x: number; y: number }[] = [];
+      for (const s of structs) {
+        const c = new THREE.Vector3((s.box!.min[0] + s.box!.max[0] + 1) / 2, (s.box!.min[1] + s.box!.max[1] + 1) / 2, (s.box!.min[2] + s.box!.max[2] + 1) / 2).project(this.camera);
+        if (c.z < -1 || c.z > 1 || Math.abs(c.x) > 1 || Math.abs(c.y) > 1) continue;
+        labels.push({ id: s.id, name: s.name, x: Math.round(((c.x + 1) / 2) * w), y: Math.round(((1 - c.y) / 2) * h) });
+      }
+      let url = this.renderer.domElement.toDataURL("image/png");
+      if (opts.labels) {
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        const g = cv.getContext("2d")!;
+        g.drawImage(this.renderer.domElement, 0, 0, w, h);
+        g.font = "bold 13px sans-serif";
+        for (const l of labels) {
+          const t = l.id;
+          const tw = g.measureText(t).width + 8;
+          g.fillStyle = "rgba(20,40,32,.78)";
+          g.fillRect(l.x - tw / 2, l.y - 9, tw, 18);
+          g.fillStyle = "#fff";
+          g.fillText(t, l.x - tw / 2 + 4, l.y + 5);
+        }
+        url = cv.toDataURL("image/png");
+      }
+      images[v] = url;
+      meta[v] = { camera: { position: this.camera.position.toArray().map((n) => +n.toFixed(2)), target: this.controls.target.toArray().map((n) => +n.toFixed(2)), fov: this.camera.fov }, labels };
+    }
+    // restore
+    this.chunks.only = null;
+    this.chunks.paletteDirty = true;
+    this.renderer.setPixelRatio(prevRatio);
+    this.renderer.setSize(prevSize.x, prevSize.y, false);
+    this.camera.aspect = prevAspect;
+    this.camera.updateProjectionMatrix();
+    this.camera.position.copy(prevPos);
+    this.controls.target.copy(prevTarget);
+    this.highlight.visible = hv; this.ghost.visible = gv;
+    return { images, meta, size: [w, h], visibleStructures: structs.map((s) => ({ id: s.id, name: s.name, type: s.type, box: s.box })) };
+  }
+
   /** PNG data URL of the current view (all pending chunks meshed first). */
   screenshot(): string {
     this.chunks.flush();

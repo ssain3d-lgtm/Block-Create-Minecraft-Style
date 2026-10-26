@@ -3,22 +3,25 @@ import type { Engine, CommandResponse } from "../engine/engine";
 import { toRequests } from "../cli/input";
 import * as plans from "../../examples/plans";
 
+/** runs one command; the studio passes its exec() so commands are mirrored to a linked server */
+export type Run = (req: { cmd: string; args?: unknown }) => CommandResponse;
+
 export interface Example {
   name: string;
-  build(engine: Engine, log: (r: CommandResponse) => void): void;
+  build(engine: Engine, log: (r: CommandResponse) => void, run?: Run): void;
 }
 
-function runAll(engine: Engine, cmds: { cmd: string; args: unknown }[], log: (r: CommandResponse) => void) {
+function runAll(run: Run, cmds: { cmd: string; args: unknown }[], log: (r: CommandResponse) => void) {
   for (const c of cmds) {
-    const r = engine.execute(c);
+    const r = run(c);
     if (!r.ok) { log(r); break; }
   }
 }
 
 /** Small first-run scene built only from basic commands. */
-export function buildDemo(engine: Engine, log: (r: CommandResponse) => void = () => {}) {
-  engine.execute({ cmd: "newProject", args: { name: "첫 작업", cellSize: 1 } });
-  runAll(engine, [
+export function buildDemo(engine: Engine, log: (r: CommandResponse) => void = () => {}, run: Run = (r) => engine.execute(r)) {
+  run({ cmd: "newProject", args: { name: "첫 작업", cellSize: 1 } });
+  runAll(run, [
     { cmd: "setProjectInfo", args: { title: "작은 광장", description: "기본 명령만으로 만든 시작 장면.\n블록 편집이나 AI 명령으로 이어서 지어 보세요.", tags: ["샘플"] } },
     { cmd: "fillRegion", args: { from: [-12, 0, -12], to: [12, 0, 12], material: "grass", structure: { name: "잔디 바닥", type: "terrain" } } },
     { cmd: "fillRegion", args: { from: [-10, 1, -10], to: [10, 1, 10], material: "paving", shape: "floor", structure: { name: "광장", type: "terrain" } } },
@@ -34,8 +37,8 @@ export function buildDemo(engine: Engine, log: (r: CommandResponse) => void = ()
 }
 
 /** Every builtin shape in four orientations + an AI-made custom block, on a plinth. */
-export function buildShowcase(engine: Engine, log: (r: CommandResponse) => void = () => {}) {
-  engine.execute({ cmd: "newProject", args: { name: "형상 견본", cellSize: 1 } });
+export function buildShowcase(engine: Engine, log: (r: CommandResponse) => void = () => {}, run: Run = (r) => engine.execute(r)) {
+  run({ cmd: "newProject", args: { name: "형상 견본", cellSize: 1 } });
   const shapes = engine.assets.builtinShapes_().map((s) => s.id);
   const mats = ["iron_lower", "stone_light", "brick", "wood_oak", "roof_tile", "concrete", "glass", "leaf"];
   const cmds: { cmd: string; args: unknown }[] = [
@@ -54,15 +57,15 @@ export function buildShowcase(engine: Engine, log: (r: CommandResponse) => void 
   cmds.push({ cmd: "fillRegion", args: { from: [0, 1, 14], to: [8, 1, 14], shape: "ai.curved_tile", material: "ai.kawara_gray", facing: "north", structure: "AI 곡선 기와" } });
   cmds.push({ cmd: "fillRegion", args: { from: [12, 0, 14], to: [12, 3, 14], shape: "ai.round_column", material: "stone_light", structure: { name: "AI 둥근 기둥", type: "column" } } });
   cmds.push({ cmd: "fillRegion", args: { from: [16, 0, 14], to: [16, 3, 14], shape: "ai.round_column", material: "stone_light", structure: "AI 둥근 기둥" } });
-  runAll(engine, cmds, log);
+  runAll(run, cmds, log);
 }
 
 function planExample(name: string, make: () => unknown): Example {
   return {
     name,
-    build(engine, log) {
+    build(engine, log, run = (r) => engine.execute(r)) {
       for (const req of toRequests(make())) {
-        const r = engine.execute(req);
+        const r = run(req);
         log(r);
         if (!r.ok) break;
       }
@@ -75,6 +78,6 @@ export const EXAMPLES: Example[] = [
   planExample("B. 일본 성곽", plans.castlePlan),
   planExample("C. 비대칭 모던하우스", plans.modernPlan),
   planExample("D. AI 테스트 하우스 (JSON 명령만)", plans.housePlan),
-  { name: "작은 광장 (기본 명령 데모)", build: (e, log) => buildDemo(e, log) },
-  { name: "형상·재질 견본 (AI 사용자 정의 블록 포함)", build: (e, log) => buildShowcase(e, log) },
+  { name: "작은 광장 (기본 명령 데모)", build: (e, log, run) => buildDemo(e, log, run) },
+  { name: "형상·재질 견본 (AI 사용자 정의 블록 포함)", build: (e, log, run) => buildShowcase(e, log, run) },
 ];

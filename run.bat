@@ -1,5 +1,5 @@
 @echo off
-rem AI Voxel Architecture Studio - start the studio (installs packages the first time)
+rem AI Voxel Architecture Studio - studio + AI API on http://127.0.0.1:7878
 cd /d "%~dp0"
 where node >nul 2>nul
 if errorlevel 1 (
@@ -16,6 +16,7 @@ if not exist node_modules (
     exit /b 1
   )
 )
-echo Starting the studio at http://localhost:5173
-call npx vite --open
+echo Starting the studio. The browser opens in a few seconds: http://127.0.0.1:7878
+start "" cmd /c "timeout /t 5 >nul && start http://127.0.0.1:7878"
+call npx tsx src\server\main.ts
 pause

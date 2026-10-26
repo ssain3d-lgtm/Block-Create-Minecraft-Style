@@ -8,10 +8,15 @@ import { Viewport, ViewPreset, Ambience } from "./viewport";
 import { idbGet, idbPut, localStorageLibrary, downloadText, pickFile } from "./storage";
 import { buildDemo, EXAMPLES } from "./examples";
 import { runBench, showBenchPanel } from "./bench";
+import { connectServer, Link } from "./link";
+import { exportGLB } from "../export/glb";
 
 type Mode = "view" | "add" | "remove" | "paint";
 
 const engine = new Engine({ library: localStorageLibrary() });
+const params = new URLSearchParams(location.search);
+const HEADLESS = params.has("headless");
+let link: Link | null = null;
 
 const state = {
   mode: "view" as Mode,
@@ -39,6 +44,7 @@ app.innerHTML = `
     <button data-act="new" title="새 프로젝트">새로</button>
     <button data-act="open" title="프로젝트 파일 열기">열기</button>
     <button data-act="save" title="프로젝트 파일 저장 (Ctrl+S)">저장</button>
+    <button data-act="glb" title="3D 모델(.glb) 내보내기">GLB</button>
     <button data-act="undo" title="되돌리기 (Ctrl+Z)">↶</button>
     <button data-act="redo" title="다시하기 (Ctrl+Y)">↷</button>
   </div>
@@ -62,6 +68,7 @@ const viewport = new Viewport($("view"), engine);
 // ---------------- command helpers ----------------
 function exec(req: CommandRequest, echo = false): CommandResponse {
   const r = engine.execute(req);
+  if (r.ok) link?.mirror(req);
   if (echo || !r.ok) log(r);
   return r;
 }
@@ -193,8 +200,9 @@ function renderSide() {
         ${EXAMPLES.map((e, i) => `<option value="${i}">${esc(e.name)}</option>`).join("")}
       </select>
       <textarea class="cmd" id="cmd" spellcheck="false" placeholder='{"cmd":"fillRegion","args":{"from":[0,0,0],"to":[4,0,4],"material":"stone"}}'></textarea>
-      <div class="row c2" style="margin-top:5px">
+      <div class="row c3" style="margin-top:5px">
         <button class="btn on" id="run">실행</button>
+        <button class="btn" id="inspect" title="떠 있는 블록·누락·빈 구조물 자동 검사">검수</button>
         <button class="btn" id="cmds">명령 목록</button>
       </div>
       <div class="out" id="out">${state.output.map((o) => `<div class="${o.ok ? "ok" : "err"}">${esc(o.text)}</div>`).join("")}</div>
@@ -237,6 +245,16 @@ $("side").addEventListener("click", (e) => {
     if (d.sact === "del" && confirm(`${s.name} (${s.id}) 를 삭제할까요? 되돌리기로 복구할 수 있습니다.`)) exec({ cmd: "deleteStructure", args: { id: sid } }, true);
     state.selected = sid;
   } else if (btn.id === "run") runCommandText();
+  else if (btn.id === "inspect") {
+    const r = exec({ cmd: "inspectProject" });
+    if (r.ok) {
+      const issues = r.result.issues as { severity: string; message: string; bounds?: { min: Vec3; max: Vec3 } }[];
+      state.output.unshift({ ok: r.result.ok, text: `${r.result.ok ? "✓" : "✗"} ${r.summary}` });
+      for (const i of issues.filter((x) => x.severity !== "info").slice(0, 10).reverse()) state.output.unshift({ ok: i.severity !== "error", text: `  ${i.severity === "error" ? "✗" : "⚠"} ${i.message}` });
+      const first = issues.find((x) => x.severity !== "info" && x.bounds);
+      if (first?.bounds) viewport.focusBox(first.bounds.min, first.bounds.max, viewport.camera.position.clone().sub(viewport.controls.target));
+    }
+  }
   else if (btn.id === "cmds") {
     const r = exec({ cmd: "listCommands" });
     if (r.ok) state.output.unshift({ ok: true, text: r.result.commands.map((c: { name: string }) => c.name).join(", ") });
@@ -275,7 +293,7 @@ function loadExample(i: number) {
   if (!ex) return;
   if (engine.project.world.blockCount > 0 && !confirm(`현재 프로젝트를 닫고 "${ex.name}" 예제를 열까요? (저장하지 않은 작업은 자동 저장본에만 남습니다)`)) return;
   const t0 = performance.now();
-  ex.build(engine, (r) => log(r));
+  ex.build(engine, (r) => log(r), (req) => exec(req));
   state.output.unshift({ ok: true, text: `✓ 예제 "${ex.name}" ${engine.project.world.blockCount.toLocaleString()}블록 (${Math.round(performance.now() - t0)}ms)` });
   viewport.chunks.reset();
   afterBigChange();
@@ -300,12 +318,22 @@ document.querySelector(".toolbar")!.addEventListener("click", async (e) => {
     afterBigChange();
     viewport.view("all", false);
   } else if (act === "save") saveFile();
+  else if (act === "glb") {
+    const { bytes, triangles } = exportGLB(engine.project);
+    const blob = new Blob([bytes as Uint8Array<ArrayBuffer>], { type: "model/gltf-binary" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${engine.project.meta.name || "scene"}.glb`;
+    a.click();
+    toast(`GLB 내보내기 완료 (${triangles.toLocaleString()} 삼각형)`);
+  }
   else if (act === "open") {
     const f = await pickFile(".json,.vox.json");
     if (!f) return;
     try {
       const file = JSON.parse(await f.text()) as ProjectFile;
       engine.loadFile(file);
+      await link?.replaceProject();
       viewport.chunks.reset();
       afterBigChange();
       viewport.view("all", false);
@@ -416,9 +444,10 @@ function updateHelp() {
 
 // ---------------- status bar + compass + autosave ----------------
 let lastStatus = "";
+let linkStatus = "";
 viewport.frameHooks.push(() => {
   const c = viewport.chunks;
-  const s = `${engine.project.world.blockCount.toLocaleString()} 블록 <span class="sep">/</span> ${c.visibleBlocks.toLocaleString()} 표시 <span class="sep">/</span> ${Math.round(viewport.fps)} FPS <span class="sep">/</span> 편집 ${engine.lastEditMs.toFixed(1)}ms <span class="sep">/</span> 메시 ${c.stats().meshes} <span class="right">Minecraft-inspired · WebGL</span>`;
+  const s = `${linkStatus ? `<span class="link">● ${linkStatus}</span> <span class="sep">/</span> ` : ""}${engine.project.world.blockCount.toLocaleString()} 블록 <span class="sep">/</span> ${c.visibleBlocks.toLocaleString()} 표시 <span class="sep">/</span> ${Math.round(viewport.fps)} FPS <span class="sep">/</span> 편집 ${engine.lastEditMs.toFixed(1)}ms <span class="sep">/</span> 메시 ${c.stats().meshes} <span class="right">Minecraft-inspired · WebGL</span>`;
   if (s !== lastStatus) { $("status").innerHTML = s; lastStatus = s; }
   $("needle").setAttribute("transform", `rotate(${(-viewport.azimuth() * 180) / Math.PI} 20 30)`);
   const busy = $("busy");
@@ -430,6 +459,7 @@ engine.onChange((e) => {
   if (e.type === "load") viewport.chunks.reset();
   renderSide();
   clearTimeout(saveTimer);
+  if (HEADLESS) return;
   saveTimer = window.setTimeout(() => {
     idbPut("autosave", JSON.stringify(engine.project.toFile(true))).catch(() => toast("자동 저장 실패 (브라우저 저장소)"));
   }, 1200);
@@ -438,20 +468,35 @@ engine.onChange((e) => {
 // ---------------- boot ----------------
 async function boot() {
   let restored = false;
-  try {
-    const saved = await idbGet("autosave");
-    if (saved) {
-      engine.loadFile(JSON.parse(saved));
-      restored = engine.project.world.blockCount > 0 || engine.project.meta.structures.length > 0;
-    }
-  } catch { /* first run or blocked storage */ }
-  if (!restored) buildDemo(engine);
+  // 1) a vox server on the same origin? (npm run serve / run.bat) -> live link, server is the source of truth
+  if (!params.has("bench")) {
+    link = await connectServer(engine, viewport, {
+      headless: HEADLESS,
+      onStatus: (s) => { linkStatus = s.startsWith("서버") ? "서버 연결" : s; if (!HEADLESS) toast(s); },
+      onRemote: (summary) => { if (!HEADLESS) toast(`AI · ${summary}`); afterBigChange(); renderSide(); },
+    });
+  }
+  if (link) {
+    linkStatus = "서버 연결";
+    restored = true;
+    if (engine.project.world.blockCount === 0 && engine.project.meta.structures.length === 0 && !HEADLESS) buildDemo(engine, () => {}, (r) => exec(r));
+  } else if (!HEADLESS) {
+    // 2) standalone: restore the browser autosave
+    try {
+      const saved = await idbGet("autosave");
+      if (saved) {
+        engine.loadFile(JSON.parse(saved));
+        restored = engine.project.world.blockCount > 0 || engine.project.meta.structures.length > 0;
+      }
+    } catch { /* first run or blocked storage */ }
+    if (!restored) buildDemo(engine);
+  }
   viewport.chunks.reset();
   afterBigChange();
   viewport.view("all", false);
   renderSide();
   updateHelp();
-  if (restored) toast("마지막 작업을 불러왔습니다");
+  if (restored && !link) toast("마지막 작업을 불러왔습니다");
   const bench = new URLSearchParams(location.search).get("bench");
   if (bench !== null) {
     const ids = bench && bench !== "1" ? bench.split(",") : null;
