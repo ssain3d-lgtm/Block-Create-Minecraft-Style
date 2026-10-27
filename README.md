@@ -118,3 +118,19 @@ Testing on Windows / RTX 5090: [`docs/WINDOWS_TEST.en.md`](docs/WINDOWS_TEST.en.
 Design (Korean): [`DESIGN.md`](DESIGN.md) · progress log and measurements (Korean): [`PROGRESS.md`](PROGRESS.md) · original brief: [`docs/INSTRUCTIONS.md`](docs/INSTRUCTIONS.md)
 
 > The example plans in `examples/` keep their Korean structure names and descriptions (they are project data); the interface, the AI guide and all engine messages are in English.
+
+## License & source attribution
+
+This project's original software is released under the [MIT License](LICENSE).
+
+**When redistributing the software or substantial portions of it, retain the MIT copyright and permission notices**, including the original repository URL in the copyright notice:
+
+```text
+Copyright (c) 2026 ssain3d-lgtm (original source: https://github.com/ssain3d-lgtm/Block-Create-Minecraft-Style)
+```
+
+If you build on this project, a visible credit in your README or project documentation is appreciated:
+
+> Based on [Small World Atelier — AI Voxel Architecture Studio](https://github.com/ssain3d-lgtm/Block-Create-Minecraft-Style) by ssain3d-lgtm.
+
+The visible credit is a request, **not an additional license condition**; the standard MIT license does not require an in-app credit or a prominent link. Third-party reference images under `docs/ref/` are not represented as MIT-licensed by this project's copyright holder; check their separate rights before reusing them.
