@@ -114,3 +114,19 @@ npm run examples         # examples/*.plan.json 다시 생성
 Windows · RTX 5090 직접 점검 방법: [`docs/WINDOWS_TEST.md`](docs/WINDOWS_TEST.md)
 
 설계: [`DESIGN.md`](DESIGN.md) · 진행 기록과 실측값: [`PROGRESS.md`](PROGRESS.md) · 원본 지시서: [`docs/INSTRUCTIONS.md`](docs/INSTRUCTIONS.md)
+
+## 라이선스 및 원본 출처
+
+이 프로젝트의 자체 개발 소프트웨어는 [MIT 라이선스](LICENSE)로 공개합니다.
+
+**소스코드 또는 그 상당 부분을 재배포할 때는 MIT 저작권·허가 고지를 유지해야 합니다.** 저작권 고지에는 원본 레포지토리 URL이 포함되어 있습니다.
+
+```text
+Copyright (c) 2026 ssain3d-lgtm (original source: https://github.com/ssain3d-lgtm/Block-Create-Minecraft-Style)
+```
+
+이 프로젝트를 활용하여 다른 프로젝트를 제작했다면 README 또는 프로젝트 문서에 다음처럼 출처를 표시해 주시길 부탁드립니다.
+
+> Based on [Small World Atelier — AI Voxel Architecture Studio](https://github.com/ssain3d-lgtm/Block-Create-Minecraft-Style) by ssain3d-lgtm.
+
+README나 앱 화면에 눈에 띄는 출처 링크를 표시하는 것은 **권장사항이지 MIT 외의 추가 법적 의무는 아닙니다.** 표준 MIT가 의무화하는 것은 저작권·허가 고지 유지입니다. `docs/ref/`의 외부 시각 참고 이미지는 본 프로젝트 저작권자의 MIT 허락 대상이라고 보장하지 않으므로, 재사용 전에 별도 권리를 확인하세요.
